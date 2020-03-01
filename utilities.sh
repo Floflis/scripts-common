@@ -3,8 +3,7 @@
 # Author: Bertrand Benoit <mailto:contact@bertrand-benoit.net>
 # Version: 2.0
 #
-# Description: Common utilities for all Bsquare's scripts (available on GitHub), and for your own scripts.
-# Repositories: https://github.com/bertrand-benoit
+# Description: Free common utilities/tool-box for GNU/Bash scripts.
 #
 # Optional variables you can define before sourcing this file:
 #  ROOT_DIR           <path>  root directory to consider when performing various check
