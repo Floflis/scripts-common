@@ -39,7 +39,7 @@ git submodule add git@gitlab.com:bertrand-benoit/scripts-common.git
 
 And then update your script to use it (e.g. if this script is in the root directory of your repository):
 ```bash
-currentDir=$( dirname "$( which "$0" )" )
+currentDir=$( dirname "$( command -v "$0" )" )
 . "$currentDir/scripts-common/utilities.sh"
 ```
 
@@ -48,7 +48,7 @@ Clone this repository in the parent directory of your own repository.
 
 You can then source the utilities this way:
 ```bash
-currentDir="$( dirname "$( which "$0" )" )"
+currentDir="$( dirname "$( command -v "$0" )" )"
 source "$( dirname "$currentDir" )/scripts-common/utilities.sh"
 ```
 
