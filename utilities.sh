@@ -185,24 +185,6 @@ function isRootUser() {
   [[ "$( whoami )" == "root" ]]
 }
 
-# usage: checkGNUWhich
-# Ensures "which" is a GNU which.
-function checkGNUWhich() {
-  [ "$( LANG=C command which --version 2>&1|head -n 1 |grep -cw "GNU" )" -eq 1 ]
-}
-
-# usage: checkEnvironment
-function checkEnvironment() {
-  checkGNUWhich || errorMessage "GNU version of which not found. Please install it." $ERROR_ENVIRONMENT
-}
-
-# usage: checkLSB
-function checkLSB() {
-  [ -f "$LSB_INIT_FUNCTONS" ] || errorMessage "Unable to find LSB file $LSB_INIT_FUNCTONS. Please install it." $ERROR_ENVIRONMENT
-  # shellcheck disable=1090
-  . "$LSB_INIT_FUNCTONS"
-}
-
 # usage: checkLocale
 function checkLocale() {
   ! isCheckModeConfigOnly && info "Checking LANG environment variable ... "
@@ -337,7 +319,7 @@ function updateStructure() {
 function isEmptyDirectory()
 {
   local _dir="${1:-}"
-  [[ -n "$_dir" && -d "$_dir" && "$( find "$_dir" -maxdepth 0 -empty 2>/dev/null|wc -l )" -eq 1 ]]
+  [[ -n "$_dir" && -d "$_dir" && "$( find "$_dir" -maxdepth 0 2>/dev/null|wc -l )" -eq 1 ]]
 }
 
 # usage: pruneSlash <path>
