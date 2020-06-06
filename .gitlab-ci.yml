@@ -1,13 +1,20 @@
 image: bash:5.0
 
 before_script:
+  - export SCRIPTS_COMMON_PATH="$PWD/utilities.sh"
+  - ln -s /usr/local/bin/bash /bin/bash
+  - echo "Installing git, procps, locale"
+  - export MUSL_LOCPATH=/usr/local/share/i18n/locales/musl
+  - apk update && apk upgrade && apk add --no-cache git procps cmake make musl-dev gcc gettext-dev libintl
+  - cd ..
+  - git clone https://gitlab.com/rilian-la-te/musl-locales.git
+  - cd musl-locales && cmake . && make && make install
+  - cd ..
   - echo "Retrieving tests project"
-  - git pull https://$CI_READ_TOKEN@gitlab.com/bertrand-benoit/scripts-common-tests.git
-  - export SCRIPTS_COMMON_PATH="$PWD/scripts-common/utilities.sh"
-  - ls
+  - git clone https://$CI_READ_TOKEN@gitlab.com/bertrand-benoit/scripts-common-tests.git --recursive
 
 test-gnu-linux-version:
   stage: test
   script:
     - echo "Testing scripts-common on comon GNU/Linux GNU/Bash version"
-    - scripts-common-tests/tests.sh
+    - BSC_TESTS_RUNASROOT=1 scripts-common-tests/tests.sh
