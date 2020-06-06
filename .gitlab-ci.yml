@@ -1,0 +1,13 @@
+image: bash:5.0
+
+before_script:
+  - echo "Retrieving tests project"
+  - git pull https://$CI_READ_TOKEN@gitlab.com/bertrand-benoit/scripts-common-tests.git
+  - export SCRIPTS_COMMON_PATH="$PWD/scripts-common/utilities.sh"
+  - ls
+
+test-gnu-linux-version:
+  stage: test
+  script:
+    - echo "Testing scripts-common on comon GNU/Linux GNU/Bash version"
+    - scripts-common-tests/tests.sh
