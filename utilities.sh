@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Author: Bertrand Benoit <mailto:contact@bertrand-benoit.net>
-# Version: 2.0
+# Version: 2.1
 #
 # Description: Free common utilities/tool-box for GNU/Bash scripts.
 #
@@ -24,6 +24,8 @@
 # N.B.: when using checkAndSetConfig function (see usage), you can get back the corresponding configuration in LAST_READ_CONFIG variable
 #        if it has NOT been found, it is set to $CONFIG_NOT_FOUND.
 
+# You should never have to update this script directly, see README.md file if you need to report an issue requesting more configurability.
+
 #########################
 ## Global configuration
 # Cf. http://www.gnu.org/software/bash/manual/bashref.html#The-Shopt-Builtin
@@ -39,22 +41,11 @@ set -o errtrace
 [ "${DISABLE_ERROR_TRAP:-0}" -eq 0 ] && trap '_status=$?; dumpFuncCall $_status' ERR
 #trap '_status=$?; [ $_status -ne 0 ] && dumpFuncCall $_status' EXIT
 
+# N.B.: since version 2.1, global variable definition are at end of this script
+#       (required by compatibility mode implementation, based on some functions)
+
 #########################
 ## Constants
-launchedScriptName="$( basename "$0" )"
-declare -r DEFAULT_ROOT_DIR="${DEFAULT_ROOT_DIR:-${HOME:-/home/$( whoami )}/$launchedScriptName}"
-declare -r DEFAULT_TMP_DIR="${TMP_DIR:-/tmp/$( printf "%(%Y-%m-%d-%H-%M-%S)T" -1 )-$launchedScriptName}"
-declare -r DEFAULT_LOG_FILE="${DEFAULT_LOG_FILE:-$DEFAULT_TMP_DIR/logFile.log}"
-declare -r DEFAULT_TIME_FILE="$DEFAULT_TMP_DIR/timeFile"
-
-declare -r DEFAULT_CONFIG_FILE="$DEFAULT_ROOT_DIR/.config/$launchedScriptName.conf"
-declare -r DEFAULT_GLOBAL_CONFIG_FILE="/etc/$launchedScriptName.conf"
-declare -r DEFAULT_PID_DIR="$DEFAULT_TMP_DIR/_pids"
-
-mkdir -p "$DEFAULT_PID_DIR"
-
-declare -r LSB_INIT_FUNCTONS="/lib/lsb/init-functions"
-
 # Log Levels.
 declare -r LOG_LEVEL_INFO=1
 declare -r LOG_LEVEL_MESSAGE=2
@@ -105,30 +96,6 @@ declare -r DAEMON_ACTION_STOP="stop"
 declare -r DAEMON_ACTION_DAEMON="daemon"
 declare -r DAEMON_ACTION_RUN="run"
 
-#########################
-## Global variables
-DEBUG_UTILITIES=${DEBUG_UTILITIES:-0}
-VERBOSE=${VERBOSE:-$DEBUG_UTILITIES}
-# special toggle defining if system must quit after configuration check (activate when using -X option of scripts)
-MODE_CHECK_CONFIG=${MODE_CHECK_CONFIG:-0}
-# Defines default CATEGORY if not already defined.
-CATEGORY=${CATEGORY:-general}
-# By default, system logs messages on console.
-LOG_CONSOLE_OFF=${LOG_CONSOLE_OFF:-0}
-# Initializes temporary log file with temporary value.
-LOG_FILE=${LOG_FILE:-$DEFAULT_LOG_FILE}
-# By default, each component has a specific log file
-#  (LOG_FILE_APPEND_MODE allows to define if caller script can continue to log in same file).
-LOG_FILE_APPEND_MODE=${LOG_FILE_APPEND_MODE:-0}
-
-# By default, any error message will totally ends the script.
-# This variable allows changing this behaviour (NOT recommended !!!)
-ERROR_MESSAGE_EXITS_SCRIPT=${ERROR_MESSAGE_EXITS_SCRIPT:-1}
-
-# Initializes environment variables if not already the case.
-ANT_HOME=${ANT_HOME:-}
-JAVA_HOME=${JAVA_HOME:-}
-LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}
 
 #########################
 ## Functions - Debug
@@ -240,10 +207,11 @@ function _doWriteMessage() {
   [ "$_newLine" -eq 0 ] && printMessageEnd="" || printMessageEnd="\n"
 
   # Checks if message must be shown on console.
+  _timestamp=$( getFormattedDatetime '%Y-%d-%m %H:%M.%S' )
   if [ "$LOG_CONSOLE_OFF" -eq 0 ]; then
-    printf "%-17(%d/%m/%y %H:%M.%S)T %-15s $_messagePrefix%b$printMessageEnd" -1 "[$CATEGORY]" "$_message" |tee -a "$LOG_FILE"
+    printf "%-17s %-15s $_messagePrefix%b$printMessageEnd" "$_timestamp" "[$CATEGORY]" "$_message" |tee -a "$LOG_FILE"
   else
-    printf "%-17(%d/%m/%y %H:%M.%S)T %-15s $_messagePrefix%b$printMessageEnd" -1 "[$CATEGORY]" "$_message" >> "$LOG_FILE"
+    printf "%-17s %-15s $_messagePrefix%b$printMessageEnd" "$_timestamp" "[$CATEGORY]" "$_message" >> "$LOG_FILE"
   fi
 
   # Manages exit if needed.
@@ -463,6 +431,14 @@ function doListConfigKeyValues() {
 # <key remove pattern>: optional refular expression of key's part to remove in the final associative array (can be useful to use pattern matching with remaining part of key).
 function loadConfigKeyValueList() {
   local _searchPattern="${1:-.*}" _keyRemovePattern="${2:-}"
+
+  # Compatibility safe-guard.
+  if [ ${_BSC_COMPAT_ASSOCIATIVE_ARRAY:-0} -eq 0 ]; then
+    # This feature can only work with associative array.
+    LAST_READ_CONFIG_KEY_VALUE_LIST="Your GNU/Bash version '$BASH_VERSION' does not support associative array."
+    return
+  fi
+
   declare -gA LAST_READ_CONFIG_KEY_VALUE_LIST=() # [re]init associative global array
 
   # Reads all configuration key from global configuration file if any.
@@ -635,19 +611,26 @@ function getDetailedVersion() {
   echo "$_majorVersion$lastCommit"
 }
 
-# usage: isVersionGreater <version 1> <version 2>
-# Version syntax must be digits separated by dot (e.g. 0.1.0).
+# usage: isVersionGreater <version 1> <version 2> [<orEquals>]
+# <version N>: syntax must be dot separated digits (e.g. 0.1.0)
+# <orEquals>: 0|1 to turn the function to *isVersionGreaterOrEquals*.
+#
+# Checks if <version 1> is greater than <version 2>.
+# By default, if both versions are equal, function returns false.
+# If <orEquals> is defined to 1, and both versions are equal, function returns true.
 function isVersionGreater() {
+  local _version1="$1" _version2="$2" _orEquals="${3:-0}"
+
   # Safeguard - ensures syntax is respected.
-  [ "$( echo "$1" |grep -ce "^[0-9][0-9.]*$" )" -eq 1 ] || errorMessage "Unable to compare version because version '$1' does not fit the syntax (digits separated by dot)" $ERROR_ENVIRONMENT
-  [ "$( echo "$2" |grep -ce "^[0-9][0-9.]*$" )" -eq 1 ] || errorMessage "Unable to compare version because version '$2' does not fit the syntax (digits separated by dot)" $ERROR_ENVIRONMENT
+  [ "$( echo "$_version1" |grep -ce "^[0-9][0-9.]*$" )" -eq 1 ] || errorMessage "Unable to compare version because version '$_version1' does not fit the syntax (digits separated by dot)" $ERROR_ENVIRONMENT
+  [ "$( echo "$_version2" |grep -ce "^[0-9][0-9.]*$" )" -eq 1 ] || errorMessage "Unable to compare version because version '$_version2' does not fit the syntax (digits separated by dot)" $ERROR_ENVIRONMENT
 
   # Checks if the version are equals (in which case the first one is NOT greater than the second).
-  [[ "$1" == "$2" ]] && return 1
+  [[ "$_version1" == "$_version2" ]] && return $((_orEquals-1))
 
   # Defines arrays with specified versions.
-  IFS='.' read -ra _v1Array <<< "$1"
-  IFS='.' read -ra _v2Array <<< "$2"
+  IFS='.' read -ra _v1Array <<< "$_version1"
+  IFS='.' read -ra _v2Array <<< "$_version2"
 
   # Lookups version element until they are not the same.
   index=0
@@ -677,9 +660,21 @@ function isVersionGreater() {
 #########################
 ## Functions - Time feature
 
+# Usage: getFormattedDate <date Format>
+# Date format corresponds to date tool format.
+function getFormattedDatetime() {
+  local _dateFormat="$1"
+
+  if [ ${_BSC_COMPAT_DATE_PRINTF:-0} -eq 1 ]; then
+    printf "%($_dateFormat)T" -1
+  else
+    date +"$_dateFormat"
+  fi
+}
+
 # usage: initializeUptime
 function initializeStartTime() {
-  printf "%(%s)T" -1 > "${TIME_FILE:-$DEFAULT_TIME_FILE}"
+  getFormattedDatetime '%s' > "${TIME_FILE:-$DEFAULT_TIME_FILE}"
 }
 
 # usage: finalizeStartTime
@@ -692,7 +687,7 @@ function getUptime() {
   local _currentTime _startTime _uptime
   [ ! -f "${TIME_FILE:-$DEFAULT_TIME_FILE}" ] && echo "not started" && exit 0
 
-  _currentTime=$( printf "%(%s)T" -1 )
+  _currentTime=$( getFormattedDatetime '%s' )
   _startTime=$( <"${TIME_FILE:-$DEFAULT_TIME_FILE}" )
   _uptime=$((_currentTime - _startTime))
 
@@ -1139,3 +1134,53 @@ function manageAntHome() {
 
   writeMessage "Found: $( "$_antPath" -v 2>&1|head -n 1 )"
 }
+
+
+#########################
+## GNU/Bash compatbility check
+# N.B.: now that functions are defined, we can use them.
+
+# GNU/Bash printf Date feature is available since version 4.3
+if isVersionGreater "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}" "4.3" 1; then
+  declare -r _BSC_COMPAT_DATE_PRINTF=1
+  declare -r _BSC_COMPAT_ASSOCIATIVE_ARRAY=1
+fi
+
+#########################
+## Default variables' values
+launchedScriptName="$( basename "$0" )"
+declare -r DEFAULT_ROOT_DIR="${DEFAULT_ROOT_DIR:-${HOME:-/home/$( whoami )}/$launchedScriptName}"
+declare -r DEFAULT_TMP_DIR="${TMP_DIR:-/tmp/$( getFormattedDatetime '%Y-%m-%d-%H-%M-%S' )-$launchedScriptName}"
+declare -r DEFAULT_LOG_FILE="${DEFAULT_LOG_FILE:-$DEFAULT_TMP_DIR/logFile.log}"
+declare -r DEFAULT_TIME_FILE="$DEFAULT_TMP_DIR/timeFile"
+
+declare -r DEFAULT_CONFIG_FILE="$DEFAULT_ROOT_DIR/.config/$launchedScriptName.conf"
+declare -r DEFAULT_GLOBAL_CONFIG_FILE="/etc/$launchedScriptName.conf"
+declare -r DEFAULT_PID_DIR="$DEFAULT_TMP_DIR/_pids"
+
+updateStructure "$DEFAULT_PID_DIR"
+
+#########################
+## Global variables
+DEBUG_UTILITIES=${DEBUG_UTILITIES:-0}
+VERBOSE=${VERBOSE:-$DEBUG_UTILITIES}
+# special toggle defining if system must quit after configuration check (activate when using -X option of scripts)
+MODE_CHECK_CONFIG=${MODE_CHECK_CONFIG:-0}
+# Defines default CATEGORY if not already defined.
+CATEGORY=${CATEGORY:-general}
+# By default, system logs messages on console.
+LOG_CONSOLE_OFF=${LOG_CONSOLE_OFF:-0}
+# Initializes temporary log file with temporary value.
+LOG_FILE=${LOG_FILE:-$DEFAULT_LOG_FILE}
+# By default, each component has a specific log file
+#  (LOG_FILE_APPEND_MODE allows to define if caller script can continue to log in same file).
+LOG_FILE_APPEND_MODE=${LOG_FILE_APPEND_MODE:-0}
+
+# By default, any error message will totally ends the script.
+# This variable allows changing this behaviour (NOT recommended !!!)
+ERROR_MESSAGE_EXITS_SCRIPT=${ERROR_MESSAGE_EXITS_SCRIPT:-1}
+
+# Initializes environment variables if not already the case.
+ANT_HOME=${ANT_HOME:-}
+JAVA_HOME=${JAVA_HOME:-}
+LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}
