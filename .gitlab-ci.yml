@@ -1,4 +1,5 @@
-before_script:
+.before_script_template:
+  before_script:
 # Updates image to be able to launch scripts-common-tests.
   - export SCRIPTS_COMMON_PATH="$PWD/utilities.sh"
   - export REPOSITORIES_DIR="$PWD/.."
@@ -28,6 +29,7 @@ before_script:
 
 # Usually GNU/Bash 5.0+ is available on modern GNU/Linux OS.
 v5.0-gnu-bash:
+  extends: .before_script_template
   stage: test
   image: bash:5.0
   script:
@@ -38,6 +40,7 @@ v5.0-gnu-bash:
       - coverage/
 
 v4.0-gnu-bash:
+  extends: .before_script_template
   stage: test
   image: bash:4.0
   script:
@@ -46,6 +49,7 @@ v4.0-gnu-bash:
 
 # Only GNU/Bash 3.2+ seems available on some MacOS OS.
 v3.2-gnu-bash:
+  extends: .before_script_template
   stage: test
   image: bash:3.2
   script:
