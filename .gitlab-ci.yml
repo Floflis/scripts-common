@@ -1,5 +1,5 @@
 .before_script_common_template:
-  before_script_common:
+  before_script:
 # Defines environment variable needed by all stages.
   - export REPOSITORIES_DIR="$PWD/.."
   - export SCRIPTS_COMMON_REPOSITORY="$REPOSITORIES_DIR/scripts-common"
@@ -7,8 +7,8 @@
   - export LOG_FILE="$SCRIPTS_COMMON_REPOSITORY/tests.log"
 
 .before_script_template:
+  extends: .before_script_common_template
   before_script:
-  extends: .before_script_template
 # Updates image to be able to launch scripts-common-tests.
   - ln -s /usr/local/bin/bash /bin/bash
 # Installs required dependency, including procps and locale which are not available in Bash Docker image.
