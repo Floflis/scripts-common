@@ -20,6 +20,7 @@
 #  LOG_FILE                   <path> path of the log file
 #  LOG_FILE_APPEND_MODE         0|1  activate append mode, instead of override one
 #  MODE_CHECK_CONFIG   0|1  check ALL configuration and then quit (useful to check all the configuration you want, +/- like a dry run)
+#  BSC_FORCE_COMPAT_MODE        0|1  activate compatibility mode (not recommended in production)
 #
 # N.B.: when using checkAndSetConfig function (see usage), you can get back the corresponding configuration in LAST_READ_CONFIG variable
 #        if it has NOT been found, it is set to $CONFIG_NOT_FOUND.
@@ -433,7 +434,7 @@ function loadConfigKeyValueList() {
   local _searchPattern="${1:-.*}" _keyRemovePattern="${2:-}"
 
   # Compatibility safe-guard.
-  if [ ${_BSC_COMPAT_ASSOCIATIVE_ARRAY:-0} -eq 0 ]; then
+  if [ ${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_ASSOCIATIVE_ARRAY:-0}} -eq 0 ]; then
     # This feature can only work with associative array.
     LAST_READ_CONFIG_KEY_VALUE_LIST="Your GNU/Bash version '$BASH_VERSION' does not support associative array."
     return
@@ -665,7 +666,7 @@ function isVersionGreater() {
 function getFormattedDatetime() {
   local _dateFormat="$1"
 
-  if [ ${_BSC_COMPAT_DATE_PRINTF:-0} -eq 1 ]; then
+  if [ ${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_DATE_PRINTF:-0}} -eq 1 ]; then
     printf "%($_dateFormat)T" -1
   else
     date +"$_dateFormat"
@@ -1064,7 +1065,7 @@ function manageJavaHome() {
       # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
       local _errorMessage="You must either configure JAVA_HOME environment variable or environment.java.home configuration element."
       ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_ENVIRONMENT
-      warning "$_errorMessage" && return 0
+      warning "$_errorMessage" && return $ERROR_ENVIRONMENT
     fi
 
     # Ensures it exists.
@@ -1072,7 +1073,7 @@ function manageJavaHome() {
       # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
       local _errorMessage="environment.java.home defined '$javaHome' which is not found."
       ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_CONFIG_VARIOUS
-      warning "$_errorMessage" && return 0
+      warning "$_errorMessage" && return $ERROR_ENVIRONMENT
     fi
 
     export JAVA_HOME="$javaHome"
@@ -1083,15 +1084,15 @@ function manageJavaHome() {
   local _javacPath="$JAVA_HOME/bin/javac"
   _errorMessage=""
   if [ ! -f "$_javaPath" ]; then
-    _errorMessage="Unable to find java binary, ensure '$JAVA_HOME' is the home of a Java Development Kit version 6."
+    _errorMessage="Unable to find java binary, ensure '$JAVA_HOME' is the home of a Java Development Kit."
   elif [ ! -f "$_javacPath" ]; then
-    _errorMessage="Unable to find javac binary, ensure '$JAVA_HOME' is the home of a Java Development Kit version 6."
+    _errorMessage="Unable to find javac binary, ensure '$JAVA_HOME' is the home of a Java Development Kit."
   fi
 
   if [ -n "$_errorMessage" ]; then
     # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
     ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_ENVIRONMENT
-    warning "$_errorMessage" && return 0
+    warning "$_errorMessage" && return $ERROR_ENVIRONMENT
   fi
 
   writeMessage "Found: $( "$_javaPath" -version 2>&1|head -n 2| sed -e 's/$/ [/;' |tr -d '\n' |sed -e 's/..$/]/' )"
@@ -1141,6 +1142,7 @@ function manageAntHome() {
 # N.B.: now that functions are defined, we can use them.
 
 # GNU/Bash printf Date feature is available since version 4.3
+# N.B.: the compatibility mode can be forced on/off with BSC_FORCE_COMPAT_MODE variable.
 if isVersionGreater "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}" "4.3" 1; then
   declare -r _BSC_COMPAT_DATE_PRINTF=1
   declare -r _BSC_COMPAT_ASSOCIATIVE_ARRAY=1
