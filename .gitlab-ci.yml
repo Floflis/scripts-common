@@ -1,13 +1,16 @@
 .before_script_template:
   before_script:
 # Updates image to be able to launch scripts-common-tests.
-  - export SCRIPTS_COMMON_PATH="$PWD/utilities.sh"
   - export REPOSITORIES_DIR="$PWD/.."
+  - export SCRIPTS_COMMON_REPOSITORY="$REPOSITORIES_DIR/scripts-common"
+  - export SCRIPTS_COMMON_PATH="$SCRIPTS_COMMON_REPOSITORY/utilities.sh"
+  - export LOG_FILE="$SCRIPTS_COMMON_REPOSITORY/tests.log"
   - ln -s /usr/local/bin/bash /bin/bash
 # Installs required dependency, including procps and locale which are not available in Bash Docker image.
-  - echo "Installing git, procps, locale and ruby (required for bashcov)"
+  - echo "Installing git, procps, locale, ruby (required for bashcov), java"
   - export MUSL_LOCPATH=/usr/local/share/i18n/locales/musl
-  - apk update && apk upgrade && apk add --no-cache git procps cmake make musl-dev gcc gettext-dev libintl ruby ruby-dev
+  - apk update && apk upgrade && apk add --no-cache git procps cmake make musl-dev gcc gettext-dev libintl ruby ruby-dev openjdk9-jdk
+  - ln -s /usr/lib/jvm/default-jvm/jre/bin/javac /usr/bin/javac
   - gem install bashcov
   - cd ..
   - git clone https://gitlab.com/rilian-la-te/musl-locales.git
@@ -21,7 +24,7 @@
   - export GEM_PATH="/home/$USER/.gems"
   - export GEM_HOME="$GEM_PATH"
   - adduser --disabled-password --shell /bin/bash --gecos "" --home "/home/$USER" --uid "$USER_UID" "$USER"
-  - chgrp "$USER" $REPOSITORIES_DIR/scripts-common && chmod g+rxw $REPOSITORIES_DIR/scripts-common
+  - chgrp "$USER" $SCRIPTS_COMMON_REPOSITORY && chmod g+rxw $SCRIPTS_COMMON_REPOSITORY
 # Fixes broken simplecov / bashcov
   - su "$USER" -c 'gem install bashcov;
                    sed -i "s/^require.*load.global.config.*$//" $GEM_PATH/gems/simplecov-*/lib/simplecov/defaults.rb;
@@ -34,10 +37,11 @@ v5.0-gnu-bash:
   image: bash:5.0
   script:
     - echo "Testing scripts-common with GNU/Bash version 5.0+ (target => modern GNU/Linux OS), including coverage"
-    - su -c 'cd $REPOSITORIES_DIR/scripts-common; $GEM_PATH/bin/bashcov -s $REPOSITORIES_DIR/scripts-common-tests/tests.sh' "$USER"
+    - su -c 'cd $SCRIPTS_COMMON_REPOSITORY; $GEM_PATH/bin/bashcov -s $REPOSITORIES_DIR/scripts-common-tests/tests.sh; cat "$LOG_FILE"' "$USER"
   artifacts:
     paths:
       - coverage/
+      - "$LOG_FILE"
 
 v4.0-gnu-bash:
   extends: .before_script_template
@@ -45,7 +49,7 @@ v4.0-gnu-bash:
   image: bash:4.0
   script:
     - echo "Testing scripts-common with GNU/Bash version 4.0+"
-    - su -mc 'scripts-common-tests/tests.sh' "$USER"
+    - su -mc 'scripts-common-tests/tests.sh; cat "$LOG_FILE"' "$USER"
 
 # Only GNU/Bash 3.2+ seems available on some MacOS OS.
 v3.2-gnu-bash:
@@ -54,7 +58,7 @@ v3.2-gnu-bash:
   image: bash:3.2
   script:
     - echo "Testing scripts-common with GNU/Bash version 3.2+ (target => some MacOS version)"
-    - su -mc 'scripts-common-tests/tests.sh' "$USER"
+    - su -mc 'scripts-common-tests/tests.sh; cat "$LOG_FILE"' "$USER"
 
 
 # Publish coverage report to ease improvement.
@@ -64,6 +68,7 @@ reports:
     - v5.0-gnu-bash
   script:
     - mv coverage/ public/
+    - mv "$LOG_FILE" public/
   artifacts:
     paths:
       - public
