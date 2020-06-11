@@ -1,4 +1,5 @@
 .before_script_common_template:
+  before_script_common:
 # Defines environment variable needed by all stages.
   - export REPOSITORIES_DIR="$PWD/.."
   - export SCRIPTS_COMMON_REPOSITORY="$REPOSITORIES_DIR/scripts-common"
