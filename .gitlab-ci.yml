@@ -68,7 +68,7 @@ reports:
     - v5.0-gnu-bash
   script:
     - mv coverage/ public/
-    - mv "$LOG_FILE" public/
+    - mv "tests.log" public/
   artifacts:
     paths:
       - public
