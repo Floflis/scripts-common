@@ -37,11 +37,10 @@ v5.0-gnu-bash:
   image: bash:5.0
   script:
     - echo "Testing scripts-common with GNU/Bash version 5.0+ (target => modern GNU/Linux OS), including coverage"
-    - su -c 'cd $SCRIPTS_COMMON_REPOSITORY; $GEM_PATH/bin/bashcov -s $REPOSITORIES_DIR/scripts-common-tests/tests.sh; cat "$LOG_FILE"' "$USER"
+    - su -c 'cd $SCRIPTS_COMMON_REPOSITORY; $GEM_PATH/bin/bashcov -s $REPOSITORIES_DIR/scripts-common-tests/tests.sh; cat "$LOG_FILE"; mv "$LOG_FILE" coverage' "$USER"
   artifacts:
     paths:
       - coverage/
-      - "$LOG_FILE"
 
 v4.0-gnu-bash:
   extends: .before_script_template
@@ -68,7 +67,6 @@ reports:
     - v5.0-gnu-bash
   script:
     - mv coverage/ public/
-    - mv "tests.log" public/
   artifacts:
     paths:
       - public
