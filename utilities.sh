@@ -38,6 +38,7 @@ set -o nounset
 # Traces error in function & co.
 set -o errtrace
 
+# shellcheck disable=SC2154
 # Dumps function call in case of error, or when exiting with something else than status 0.
 [ "${DISABLE_ERROR_TRAP:-0}" -eq 0 ] && trap '_status=$?; dumpFuncCall $_status' ERR
 #trap '_status=$?; [ $_status -ne 0 ] && dumpFuncCall $_status' EXIT
@@ -434,7 +435,7 @@ function loadConfigKeyValueList() {
   local _searchPattern="${1:-.*}" _keyRemovePattern="${2:-}"
 
   # Compatibility safe-guard.
-  if [ ${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_ASSOCIATIVE_ARRAY:-0}} -eq 0 ]; then
+  if [ "${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_ASSOCIATIVE_ARRAY:-0}}" -eq 0 ]; then
     # This feature can only work with associative array.
     LAST_READ_CONFIG_KEY_VALUE_LIST="Your GNU/Bash version '$BASH_VERSION' does not support associative array."
     return
@@ -666,7 +667,7 @@ function isVersionGreater() {
 function getFormattedDatetime() {
   local _dateFormat="$1"
 
-  if [ ${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_DATE_PRINTF:-0}} -eq 1 ]; then
+  if [ "${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_DATE_PRINTF:-0}}" -eq 1 ]; then
     printf "%($_dateFormat)T" -1
   else
     date +"$_dateFormat"
@@ -783,6 +784,7 @@ function removeAllSpecifiedPartsFromString() {
 function extractNumberSequence() {
   local _string="$1" _result=""
 
+  # shellcheck disable=SC2001
   _result=$( sed -e 's/^[^0-9]*\([sS]*[0-9][0-9]*\)[ \t]*[-aàep&][ \te0]*\([1-9][0-9]*\)[^0-9]*$/\1-\2/ig;' <<< "$_string" \
             |sed -e 's/^[^0-9]*\([0-9]-*[0-9]*\)[^0-9]*$/\1/g;')
 
