@@ -7,9 +7,9 @@
   - export LOG_FILE="$SCRIPTS_COMMON_REPOSITORY/tests.log"
   - ln -s /usr/local/bin/bash /bin/bash
 # Installs required dependency, including procps and locale which are not available in Bash Docker image.
-  - echo "Installing git, procps, locale, ruby (required for bashcov), java"
+  - echo "Installing git, procps, locale, ruby (required for bashcov), java, ant and maven"
   - export MUSL_LOCPATH=/usr/local/share/i18n/locales/musl
-  - apk update && apk upgrade && apk add --no-cache git procps cmake make musl-dev gcc gettext-dev libintl ruby ruby-dev openjdk9-jdk
+  - apk update && apk upgrade && apk add --no-cache git procps cmake make musl-dev gcc gettext-dev libintl ruby ruby-dev openjdk9-jdk apache-ant maven
   - ln -s /usr/lib/jvm/default-jvm/jre/bin/javac /usr/bin/javac
   - gem install bashcov
   - cd ..

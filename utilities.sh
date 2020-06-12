@@ -38,6 +38,7 @@ set -o nounset
 # Traces error in function & co.
 set -o errtrace
 
+# shellcheck disable=SC2154
 # Dumps function call in case of error, or when exiting with something else than status 0.
 [ "${DISABLE_ERROR_TRAP:-0}" -eq 0 ] && trap '_status=$?; dumpFuncCall $_status' ERR
 #trap '_status=$?; [ $_status -ne 0 ] && dumpFuncCall $_status' EXIT
@@ -434,7 +435,7 @@ function loadConfigKeyValueList() {
   local _searchPattern="${1:-.*}" _keyRemovePattern="${2:-}"
 
   # Compatibility safe-guard.
-  if [ ${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_ASSOCIATIVE_ARRAY:-0}} -eq 0 ]; then
+  if [ "${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_ASSOCIATIVE_ARRAY:-0}}" -eq 0 ]; then
     # This feature can only work with associative array.
     LAST_READ_CONFIG_KEY_VALUE_LIST="Your GNU/Bash version '$BASH_VERSION' does not support associative array."
     return
@@ -666,7 +667,7 @@ function isVersionGreater() {
 function getFormattedDatetime() {
   local _dateFormat="$1"
 
-  if [ ${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_DATE_PRINTF:-0}} -eq 1 ]; then
+  if [ "${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_DATE_PRINTF:-0}}" -eq 1 ]; then
     printf "%($_dateFormat)T" -1
   else
     date +"$_dateFormat"
@@ -783,6 +784,7 @@ function removeAllSpecifiedPartsFromString() {
 function extractNumberSequence() {
   local _string="$1" _result=""
 
+  # shellcheck disable=SC2001
   _result=$( sed -e 's/^[^0-9]*\([sS]*[0-9][0-9]*\)[ \t]*[-aàep&][ \te0]*\([1-9][0-9]*\)[^0-9]*$/\1-\2/ig;' <<< "$_string" \
             |sed -e 's/^[^0-9]*\([0-9]-*[0-9]*\)[^0-9]*$/\1/g;')
 
@@ -1053,89 +1055,83 @@ function daemonUsage() {
 #########################
 ## Functions - Third Part PATH feature
 
-# usage: manageJavaHome
-# Ensures JAVA environment is ok, and ensures JAVA_HOME is defined.
-function manageJavaHome() {
-  # Checks if environment variable JAVA_HOME is defined.
-  if [ -z "$JAVA_HOME" ]; then
+# Should not be directly called.
+# N.B.: if you need a dedicated function for a not supported tool, please create an issue on scripts-common project.
+function _manageThidPartyToolHome() {
+  local _toolName="$1" _envVarName="$2" _configKey="$3" _binPathToCheck="$4|"
+
+  # Checks if environment variable is defined.
+  if [ -z "${!_envVarName:-}" ]; then
     # Checks if it is defined in configuration file.
-    checkAndSetConfig "environment.java.home" "$CONFIG_TYPE_OPTION"
-    declare -r javaHome="$LAST_READ_CONFIG"
-    if [ -z "$javaHome" ] || [[ "$javaHome" == "$CONFIG_NOT_FOUND" ]]; then
+    checkAndSetConfig "$_configKey" "$CONFIG_TYPE_OPTION"
+    declare -r toolHome="$LAST_READ_CONFIG"
+    if [ -z "$toolHome" ] || [[ "$toolHome" == "$CONFIG_NOT_FOUND" ]]; then
       # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
-      local _errorMessage="You must either configure JAVA_HOME environment variable or environment.java.home configuration element."
+      local _errorMessage="You must either configure '$_envVarName' environment variable or '$_configKey' configuration element."
       ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_ENVIRONMENT
       warning "$_errorMessage" && return $ERROR_ENVIRONMENT
     fi
 
     # Ensures it exists.
-    if [ ! -d "$javaHome" ]; then
-      # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
-      local _errorMessage="environment.java.home defined '$javaHome' which is not found."
-      ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_CONFIG_VARIOUS
-      warning "$_errorMessage" && return $ERROR_ENVIRONMENT
+    local _errorMessage=""
+    if [ ! -e "$toolHome" ]; then
+      _errorMessage="'$_configKey' defined '$toolHome' which does not exist."
+    elif [ ! -d "$toolHome" ]; then
+      _errorMessage="'$_configKey' defined '$toolHome' which is not a directory."
     fi
 
-    export JAVA_HOME="$javaHome"
+    if [ -n "$_errorMessage" ]; then
+      # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
+      ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_CONFIG_VARIOUS
+      warning "$_errorMessage" && return $ERROR_CONFIG_VARIOUS
+    fi
+
+    export "$_envVarName"="$toolHome"
   fi
 
-  # Ensures it is a jdk home directory.
-  local _javaPath="$JAVA_HOME/bin/java"
-  local _javacPath="$JAVA_HOME/bin/javac"
-  _errorMessage=""
-  if [ ! -f "$_javaPath" ]; then
-    _errorMessage="Unable to find java binary, ensure '$JAVA_HOME' is the home of a Java Development Kit."
-  elif [ ! -f "$_javacPath" ]; then
-    _errorMessage="Unable to find javac binary, ensure '$JAVA_HOME' is the home of a Java Development Kit."
-  fi
+  # Ensures corresponding tool binaries are found in home directory.
+  local _errorMessage=""
+  while IFS= read -r -d '|' binPathToCheck; do
+    local _toolBinPath="${!_envVarName}/$binPathToCheck"
+    if [ ! -f "$_toolBinPath" ]; then
+      _errorMessage="Unable to find $binPathToCheck binary, ensure '${!_envVarName}' is the home of $_toolName."
+      break
+    fi
+  done <<<"$_binPathToCheck"
 
   if [ -n "$_errorMessage" ]; then
     # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
-    ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_ENVIRONMENT
-    warning "$_errorMessage" && return $ERROR_ENVIRONMENT
+    ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_CONFIG_VARIOUS
+    warning "$_errorMessage" && return $ERROR_CONFIG_VARIOUS
   fi
+}
 
-  writeMessage "Found: $( "$_javaPath" -version 2>&1|head -n 2| sed -e 's/$/ [/;' |tr -d '\n' |sed -e 's/..$/]/' )"
+# For each Third party tool management function:
+#  - Checks if corresponding environment variable if defined, set it according
+#     to definition in configuration file, with lots of check (exists, directory,
+#     contains requested binaries).
+#  - If environment is defined (already defined, or defined by this utilities),
+#     checks if the requested tools exists.
+# If the function returns "ok", you are guarantee to have an environment variable
+#  properly defined.
+
+# usage: manageJavaHome
+function manageJavaHome() {
+  _manageThidPartyToolHome "a Java Development Kit" "JAVA_HOME" "environment.java.home" "bin/java|bin/javac" || return $ERROR_CONFIG_VARIOUS
+  writeMessage "Found: $( "$JAVA_HOME/bin/java" -version 2>&1|head -n 2| sed -e 's/$/ [/;' |tr -d '\n' |sed -e 's/..$/]/' )"
 }
 
 # usage: manageAntHome
-# Ensures ANT environment is ok, and ensures ANT_HOME is defined.
 function manageAntHome() {
-  # Checks if environment variable ANT_HOME is defined.
-  if [ -z "$ANT_HOME" ]; then
-    # Checks if it is defined in configuration file.
-    checkAndSetConfig "environment.ant.home" "$CONFIG_TYPE_OPTION"
-    declare -r antHome="$LAST_READ_CONFIG"
-    if [ -z "$antHome" ] || [[ "$antHome" == "$CONFIG_NOT_FOUND" ]]; then
-      # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
-      local _errorMessage="You must either configure ANT_HOME environment variable or environment.ant.home configuration element."
-      ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_ENVIRONMENT
-      warning "$_errorMessage" && return 0
-    fi
-
-    # Ensures it exists.
-    if [ ! -d "$antHome" ]; then
-      # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
-      local _errorMessage="environment.ant.home defined '$antHome' which is not found."
-      ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_CONFIG_VARIOUS
-      warning "$_errorMessage" && return 0
-    fi
-
-    export ANT_HOME="$antHome"
-  fi
-
-  # Checks ant is available.
-  local _antPath="$ANT_HOME/bin/ant"
-  if [ ! -f "$_antPath" ]; then
-    # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
-    local _errorMessage="Unable to find ant binary, ensure '$ANT_HOME' is the home of an installation of Apache Ant."
-    ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_ENVIRONMENT
-    warning "$_errorMessage" && return 0
-  fi
-
-  writeMessage "Found: $( "$_antPath" -v 2>&1|head -n 1 )"
+  _manageThidPartyToolHome "an installation of Apache Ant" "ANT_HOME" "environment.ant.home" "bin/ant" || return $ERROR_CONFIG_VARIOUS
+  writeMessage "Found: $( "$ANT_HOME/bin/ant" -v 2>&1|head -n 1 )"
 }
 
+# usage: manageMavenHome
+function manageMavenHome() {
+  _manageThidPartyToolHome "an installation of Apache Maven" "M2_HOME" "environment.maven.home" "bin/mvn" || return $ERROR_CONFIG_VARIOUS
+  writeMessage "Found: $( "$M2_HOME/bin/mvn" -v 2>&1|head -n 1 )"
+}
 
 #########################
 ## GNU/Bash compatbility check

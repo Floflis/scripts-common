@@ -35,8 +35,9 @@ source <path to define>/scripts-common/utilities.sh
 ### Method 1 - Git submodule
 You can add this project as [submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules) of your own Git repository.
 
+You can adapt the name of the branch you want to use (`stable` is the recommended one):
 ```bash
-git submodule add git@gitlab.com:bertrand-benoit/scripts-common.git
+git submodule add -b stable git@gitlab.com:bertrand-benoit/scripts-common.git
 ```
 
 And then update your script to use it (e.g. if this script is in the root directory of your repository):
@@ -44,6 +45,13 @@ And then update your script to use it (e.g. if this script is in the root direct
 currentDir=$( dirname "$( command -v "$0" )" )
 . "$currentDir/scripts-common/utilities.sh"
 ```
+
+#### Update submodule
+Whenever you want to get last version of script-commons, you can run:
+```
+git submodule update --remote
+```
+
 
 ### Method 2 - Clone repository close to yours
 Clone this repository in the parent directory of your own repository.
