@@ -218,7 +218,7 @@ function _doWriteMessage() {
 
   # Manages exit if needed.
   [ "$_exitCode" -eq -1 ] && return 0
-  [ "$ERROR_MESSAGE_EXITS_SCRIPT" -eq -0 ] && return "$_exitCode"
+  [ "$ERROR_MESSAGE_EXITS_SCRIPT" -eq 0 ] && return "$_exitCode"
   exit "$_exitCode"
 }
 
@@ -584,13 +584,13 @@ function checkAndSetConfig() {
 #########################
 ## Functions - Version Feature
 
-# usage: getVersion <file path>
+# usage: getVersion <file path> [<default version>]
 # This method returns the more recent version of the given ChangeLog/NEWS file path.
 function getVersion() {
-    local _newsFile="$1"
+    local _newsFile="${1:-ChangeLog}" _defaultVersion="${2:-0.1.0}"
 
     # Lookup the version in the NEWS file (which did not exist in version 0.1)
-    [ ! -f "$_newsFile" ] && echo "0.1.0" && return 0
+    [ ! -f "$_newsFile" ] && echo "$_defaultVersion" && return 0
 
     # Extracts the version.
     grep "version [0-9]" "$_newsFile" |head -n 1 |sed -e 's/^.*version[ \t]\([0-9][0-9.]*\)[ \t].*$/\1/;s/^.*version[ \t]\([0-9][0-9.]*\)$/\1/;'
@@ -728,11 +728,14 @@ function getLinesFromNToP() {
   tail -n $((_sourceLineCount - _lineBegin + 1)) "$_source" |head -n $((_lineEnd - _lineBegin + 1))
 }
 
-# usage: getURLContents <url> <destination file>
+# usage: getURLContents <url> <destination file> [<user agent>]
 function getURLContents() {
-  info "Getting contents of URL '$1'"
-  ! wget --user-agent="Mozilla/Firefox 3.6" -q "$1" -O "$2" && warning "Error while getting contents of URL '$1'" && return 1
-  info "Got contents of URL '$1' with success"
+  local _url="$1" _output="$2"
+  local _userAgent="${3:-Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:77.0) Gecko/20100101 Firefox/77.0}"
+
+  writeMessage "Getting contents of URL '$_url', with user-agent='$_userAgent', and dumping it to '$_output'"
+  ! wget --user-agent="$_userAgent" -q "$_url" -O "$_output" && warning "Error while getting contents of URL '$_url'" && return 1
+  info "Got contents of URL '$_url' with success"
   return 0
 }
 
@@ -864,7 +867,7 @@ function isRunningProcess() {
   return 1
 }
 
-# usage: checkAllPIDFiles [<pid directory>]
+# usage: checkAllProcessFromPIDFiles [<pid directory>]
 # Checks all existing PID files, checks if corresponding process are still running,
 #  and deletes PID files if it is not the case.
 function checkAllProcessFromPIDFiles() {
