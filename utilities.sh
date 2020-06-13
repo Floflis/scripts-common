@@ -700,11 +700,6 @@ function getUptime() {
 #########################
 ## Functions - Contents management (files, value, pattern matching ...)
 
-# usage: getConfigValue <supported values> <value to check>
-function checkAvailableValue() {
-  [ "$( echo "$1" |grep -cw "$2" )" -eq 1 ]
-}
-
 # usage: matchesOneOf <element to check> <patterns>
 function matchesOneOf() {
   local _element="$1"
@@ -731,12 +726,6 @@ function getLinesFromNToP() {
   _sourceLineCount=$( wc -l <"$_source" )
 
   tail -n $((_sourceLineCount - _lineBegin + 1)) "$_source" |head -n $((_lineEnd - _lineBegin + 1))
-}
-
-# usage: extractI18Nelement <i18n file> <destination file>
-function extractI18Nelement() {
-  local _i18nFile="$1" _destFile="$2"
-  grep -e "^[ \t]*[^#]" "$_i18nFile" |sort > "$_destFile"
 }
 
 # usage: getURLContents <url> <destination file>
