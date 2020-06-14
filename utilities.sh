@@ -548,7 +548,7 @@ function checkAndSetConfig() {
   # Manages path if needed (it is the case for PATH, BIN and DATA).
   checkPathStatus=0
   if [ "$_configType" -ne $CONFIG_TYPE_OPTION ]; then
-    [ "$_configType" -eq $CONFIG_TYPE_DATA ] && forcePrepend=1 || forcePrepend=0
+    [ "$_configType" -ne $CONFIG_TYPE_BIN ] && forcePrepend=1 || forcePrepend=0
     _value=$( buildCompletePath "$_value" "$_pathToPreprend" $forcePrepend )
 
     if [ "$_configType" -eq $CONFIG_TYPE_PATH ] && [ "$_pathMustExist" -eq 1 ]; then

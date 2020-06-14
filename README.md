@@ -8,16 +8,16 @@ This is a free common utilities/tool-box for GNU/Bash scripts, you can use for y
 ## Getting Started
 **scripts-common** provides lots of features, using mainly GNU/Bash built-in tools, like:
 -   logger (writeMessage, info, warning, error), with timestamp and category
--   environment check and utilities (locale, isRoot, LSB)
+-   environment check and utilities (locale, isRoot)
 -   path check and management (data file, directory, executable)
--   configuration file management (local configuration file, global configuration file, check and set configuration)
+-   advanced configuration file management (local configuration file, global configuration file, check and set configuration)
 -   version check (isVersionGreater)
 -   start/stop/up time
 -   pattern matching (including isNumber, isDate ...)
 -   extract lines from a file (from N, or between N and P)
 -   PID file management
 -   daemon start/pause/stop
--   Third party PATH management feature (Java, Ant ...)
+-   Third party PATH management feature (Java, Ant, Maven ...)
 
 ## Context
 Around 2000, I started writing it for my personal needs, creating lots of scripts at home and at work.
@@ -26,13 +26,13 @@ In 2010, I created [Hemera Intelligent System](https://gitlab.com/bertrand-benoi
 
 In 2019, I extracted the Hemera's utilities part, and enhanced it to get it generic, to share it with everyone.
 
-## Usage
+## Installation
 In all the following methods, you just need to source the utilities file.
 ```bash
 source <path to define>/scripts-common/utilities.sh
 ```
 
-### Method 1 - Git submodule
+### Method 1 (recommended) - Git submodule
 You can add this project as [submodule](https://git-scm.com/book/en/v2/Git-Tools-Submodules) of your own Git repository.
 
 You can adapt the name of the branch you want to use (`stable` is the recommended one):
@@ -47,7 +47,7 @@ currentDir=$( dirname "$( command -v "$0" )" )
 ```
 
 #### Update submodule
-Whenever you want to get last version of script-commons, you can run:
+Whenever you want to get last version of script-common, you can run:
 ```
 git submodule update --remote
 ```
@@ -73,7 +73,8 @@ Then, in your script, you just need to use this variable:
 source "$UTILITIES_PATH"
 ```
 
-## Environment
+## Usage
+### Environment
 There are some optional variables you can define before sourcing the `utilities.sh`, to tune the system to your needs.
 
 -   **ROOT_DIR**           `<path>`  root directory to consider when performing various check
@@ -90,6 +91,9 @@ There are some optional variables you can define before sourcing the `utilities.
 -   **MODE_CHECK_CONFIG**   `0|1`  check ALL configuration and then quit (useful to check all the configuration you want, +/- like a dry run)
 
 N.B.: when using `checkAndSetConfig` function, you can get back the corresponding configuration in **LAST_READ_CONFIG** variable (if it has NOT been found, it is set to *$CONFIG_NOT_FOUND*).
+
+### Features documentation
+This part is coming soon.
 
 ## Contributing
 Don't hesitate to [contribute](https://opensource.guide/how-to-contribute/) or to contact me if you want to improve the project.
