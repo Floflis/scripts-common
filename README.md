@@ -91,10 +91,12 @@ There are some optional variables you can define before sourcing the `utilities.
 -   **BSC_LOG_FILE**               `<path>`  path of the log file
 -   **BSC_LOG_FILE_APPEND_MODE**     `0|1`   activate append mode, instead of the default override one
 -   **BSC_MODE_CHECK_CONFIG**        `0|1`   check ALL configuration and then quit (useful to check all the configuration you want, +/- like a dry run)
+-   **BSC_DAEMON_STOP_TIMEOUT** `<integer>`  timeout (in seconds) before killing a daemon process after stop request
 
 N.B.:
- - when a configuration element is not found in **BSC_CONFIG_FILE**, system checks the **BSC_GLOBAL_CONFIG_FILE**
- - when using `checkAndSetConfig` function, you can get back the corresponding configuration in **LAST_READ_CONFIG** variable (will be set to *$CONFIG_NOT_FOUND* if not existing)
+-   when a configuration element is not found in **BSC_CONFIG_FILE**, system checks the **BSC_GLOBAL_CONFIG_FILE**
+-   when using `checkAndSetConfig` function, you can get result in **BSC_LAST_READ_CONFIG** variable (will be set to *$BSC_CONFIG_NOT_FOUND* if not existing)
+-   when using `listConfigKeys` or `loadConfigKeyValueList` functions, you can get result in **BSC_LAST_READ_CONFIG_KEY_VALUE_LIST** variable
 
 ### Features documentation
 This part is coming soon.
