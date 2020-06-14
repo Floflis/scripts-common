@@ -17,7 +17,7 @@
   - cd musl-locales && cmake . && make && make install && cd ..
 # Retrieves dedicated scripts-common tests project.
   - echo "Retrieving tests project"
-  - git clone https://$CI_READ_TOKEN@gitlab.com/bertrand-benoit/scripts-common-tests.git --recursive
+  - git clone https://$CI_READ_TOKEN@gitlab.com/bertrand-benoit/scripts-common-tests.git -b "$CI_TEST_BRANCH" --recursive
 # Creates a dedicated user, allowing to use bashcov
   - export USER=tester
   - export USER_UID=1000

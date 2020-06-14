@@ -218,7 +218,7 @@ function _doWriteMessage() {
 
   # Manages exit if needed.
   [ "$_exitCode" -eq -1 ] && return 0
-  [ "$ERROR_MESSAGE_EXITS_SCRIPT" -eq -0 ] && return "$_exitCode"
+  [ "$ERROR_MESSAGE_EXITS_SCRIPT" -eq 0 ] && return "$_exitCode"
   exit "$_exitCode"
 }
 
@@ -548,7 +548,7 @@ function checkAndSetConfig() {
   # Manages path if needed (it is the case for PATH, BIN and DATA).
   checkPathStatus=0
   if [ "$_configType" -ne $CONFIG_TYPE_OPTION ]; then
-    [ "$_configType" -eq $CONFIG_TYPE_DATA ] && forcePrepend=1 || forcePrepend=0
+    [ "$_configType" -ne $CONFIG_TYPE_BIN ] && forcePrepend=1 || forcePrepend=0
     _value=$( buildCompletePath "$_value" "$_pathToPreprend" $forcePrepend )
 
     if [ "$_configType" -eq $CONFIG_TYPE_PATH ] && [ "$_pathMustExist" -eq 1 ]; then
@@ -584,13 +584,13 @@ function checkAndSetConfig() {
 #########################
 ## Functions - Version Feature
 
-# usage: getVersion <file path>
+# usage: getVersion <file path> [<default version>]
 # This method returns the more recent version of the given ChangeLog/NEWS file path.
 function getVersion() {
-    local _newsFile="$1"
+    local _newsFile="${1:-ChangeLog}" _defaultVersion="${2:-0.1.0}"
 
     # Lookup the version in the NEWS file (which did not exist in version 0.1)
-    [ ! -f "$_newsFile" ] && echo "0.1.0" && return 0
+    [ ! -f "$_newsFile" ] && echo "$_defaultVersion" && return 0
 
     # Extracts the version.
     grep "version [0-9]" "$_newsFile" |head -n 1 |sed -e 's/^.*version[ \t]\([0-9][0-9.]*\)[ \t].*$/\1/;s/^.*version[ \t]\([0-9][0-9.]*\)$/\1/;'
@@ -700,11 +700,6 @@ function getUptime() {
 #########################
 ## Functions - Contents management (files, value, pattern matching ...)
 
-# usage: getConfigValue <supported values> <value to check>
-function checkAvailableValue() {
-  [ "$( echo "$1" |grep -cw "$2" )" -eq 1 ]
-}
-
 # usage: matchesOneOf <element to check> <patterns>
 function matchesOneOf() {
   local _element="$1"
@@ -733,17 +728,14 @@ function getLinesFromNToP() {
   tail -n $((_sourceLineCount - _lineBegin + 1)) "$_source" |head -n $((_lineEnd - _lineBegin + 1))
 }
 
-# usage: extractI18Nelement <i18n file> <destination file>
-function extractI18Nelement() {
-  local _i18nFile="$1" _destFile="$2"
-  grep -e "^[ \t]*[^#]" "$_i18nFile" |sort > "$_destFile"
-}
-
-# usage: getURLContents <url> <destination file>
+# usage: getURLContents <url> <destination file> [<user agent>]
 function getURLContents() {
-  info "Getting contents of URL '$1'"
-  ! wget --user-agent="Mozilla/Firefox 3.6" -q "$1" -O "$2" && warning "Error while getting contents of URL '$1'" && return 1
-  info "Got contents of URL '$1' with success"
+  local _url="$1" _output="$2"
+  local _userAgent="${3:-Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:77.0) Gecko/20100101 Firefox/77.0}"
+
+  writeMessage "Getting contents of URL '$_url', with user-agent='$_userAgent', and dumping it to '$_output'"
+  ! wget --user-agent="$_userAgent" -q "$_url" -O "$_output" && warning "Error while getting contents of URL '$_url'" && return 1
+  info "Got contents of URL '$_url' with success"
   return 0
 }
 
@@ -875,7 +867,7 @@ function isRunningProcess() {
   return 1
 }
 
-# usage: checkAllPIDFiles [<pid directory>]
+# usage: checkAllProcessFromPIDFiles [<pid directory>]
 # Checks all existing PID files, checks if corresponding process are still running,
 #  and deletes PID files if it is not the case.
 function checkAllProcessFromPIDFiles() {
