@@ -95,6 +95,9 @@ N.B.: when using `checkAndSetConfig` function, you can get back the correspondin
 ### Features documentation
 This part is coming soon.
 
+In the meantime, you can take inspiration from [Tests](https://gitlab.com/bertrand-benoit/scripts-common-tests/-/blob/master/tests.sh) which cover all features.
+
+
 ## Contributing
 Don't hesitate to [contribute](https://opensource.guide/how-to-contribute/) or to contact me if you want to improve the project.
 You can [report issues or request features](https://gitlab.com/bertrand-benoit/scripts-common/issues) and propose [merge requests](https://gitlab.com/bertrand-benoit/scripts-common/merge_requests).
