@@ -77,20 +77,26 @@ source "$UTILITIES_PATH"
 ### Environment
 There are some optional variables you can define before sourcing the `utilities.sh`, to tune the system to your needs.
 
--   **ROOT_DIR**           `<path>`  root directory to consider when performing various check
--   **TMP_DIR**            `<path>`  temporary directory where various dump files will be created
--   **PID_DIR**            `<path>`  directory where PID files will be created to manage daemon feature
--   **CONFIG_FILE**        `<path>`  path of configuration file to consider
--   **GLOBAL_CONFIG_FILE** `<path>`  path of GLOBAL configuration file to consider (configuration element will be checked in this one, if NOT found in the configuration file)
--   **DEBUG_UTILITIES**              `0|1`  activate debug message (not recommended in production)
--   **VERBOSE**                      `0|1`  activate info/debug message
--   **CATEGORY**                 `<string>` the category which prepends all messages
--   **LOG_CONSOLE_OFF**              `0|1`  disable message output on console
--   **LOG_FILE**                   `<path>` path of the log file
--   **LOG_FILE_APPEND_MODE**         `0|1`  activate append mode, instead of override one
--   **MODE_CHECK_CONFIG**   `0|1`  check ALL configuration and then quit (useful to check all the configuration you want, +/- like a dry run)
+-   **BSC_ROOT_DIR**               `<path>`  root directory to consider when performing various check
+-   **BSC_TMP_DIR**                `<path>`  temporary directory where various dump files are created
+-   **BSC_PID_DIR**                `<path>`  directory where PID files are created to manage daemon feature
+-   **BSC_CONFIG_FILE**            `<path>`  path of configuration file to consider
+-   **BSC_GLOBAL_CONFIG_FILE**     `<path>`  path of GLOBAL configuration file to consider
+-   **BSC_DISABLE_ERROR_TRAP**       `0|1`   disable TRAP on error (recommended only for Tests project where assert leads to 'error')
+-   **BSC_DEBUG_UTILITIES**          `0|1`   enable Debug mode (not recommended in production)
+-   **BSC_FORCE_COMPAT_MODE**        `0|1`   enable compatibility mode (not recommended in production)
+-   **BSC_VERBOSE**                  `0|1`   enable Verbose mode, showing INFO messages (not recommended in production)
+-   **BSC_CATEGORY**             `<string>`  the category which prepends all messages
+-   **BSC_LOG_CONSOLE_OFF**          `0|1`   disable message output on console
+-   **BSC_LOG_FILE**               `<path>`  path of the log file
+-   **BSC_LOG_FILE_APPEND_MODE**     `0|1`   activate append mode, instead of the default override one
+-   **BSC_MODE_CHECK_CONFIG**        `0|1`   check ALL configuration and then quit (useful to check all the configuration you want, +/- like a dry run)
+-   **BSC_DAEMON_STOP_TIMEOUT** `<integer>`  timeout (in seconds) before killing a daemon process after stop request
 
-N.B.: when using `checkAndSetConfig` function, you can get back the corresponding configuration in **LAST_READ_CONFIG** variable (if it has NOT been found, it is set to *$CONFIG_NOT_FOUND*).
+N.B.:
+-   when a configuration element is not found in **BSC_CONFIG_FILE**, system checks the **BSC_GLOBAL_CONFIG_FILE**
+-   when using `checkAndSetConfig` function, you can get result in **BSC_LAST_READ_CONFIG** variable (will be set to *$BSC_CONFIG_NOT_FOUND* if not existing)
+-   when using `listConfigKeys` or `loadConfigKeyValueList` functions, you can get result in **BSC_LAST_READ_CONFIG_KEY_VALUE_LIST** variable
 
 ### Features documentation
 This part is coming soon.

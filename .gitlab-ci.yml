@@ -4,7 +4,7 @@
   - export REPOSITORIES_DIR="$PWD/.."
   - export SCRIPTS_COMMON_REPOSITORY="$REPOSITORIES_DIR/scripts-common"
   - export SCRIPTS_COMMON_PATH="$SCRIPTS_COMMON_REPOSITORY/utilities.sh"
-  - export LOG_FILE="$SCRIPTS_COMMON_REPOSITORY/tests.log"
+  - export BSC_LOG_FILE="$SCRIPTS_COMMON_REPOSITORY/tests.log"
   - ln -s /usr/local/bin/bash /bin/bash
 # Installs required dependency, including procps and locale which are not available in Bash Docker image.
   - echo "Installing git, procps, locale, ruby (required for bashcov), java, ant and maven"
@@ -37,7 +37,7 @@ v5.0-gnu-bash:
   image: bash:5.0
   script:
     - echo "Testing scripts-common with GNU/Bash version 5.0+ (target => modern GNU/Linux OS), including coverage"
-    - su -c 'cd $SCRIPTS_COMMON_REPOSITORY; $GEM_PATH/bin/bashcov -s $REPOSITORIES_DIR/scripts-common-tests/tests.sh; cat "$LOG_FILE"; mv "$LOG_FILE" coverage' "$USER"
+    - su -c 'cd $SCRIPTS_COMMON_REPOSITORY; $GEM_PATH/bin/bashcov -s $REPOSITORIES_DIR/scripts-common-tests/tests.sh; cat "$BSC_LOG_FILE"; mv "$BSC_LOG_FILE" coverage' "$USER"
   artifacts:
     paths:
       - coverage/
@@ -48,7 +48,7 @@ v4.0-gnu-bash:
   image: bash:4.0
   script:
     - echo "Testing scripts-common with GNU/Bash version 4.0+"
-    - su -mc 'scripts-common-tests/tests.sh; cat "$LOG_FILE"' "$USER"
+    - su -mc 'scripts-common-tests/tests.sh; cat "$BSC_LOG_FILE"' "$USER"
 
 # Only GNU/Bash 3.2+ seems available on some MacOS OS.
 v3.2-gnu-bash:
@@ -57,7 +57,7 @@ v3.2-gnu-bash:
   image: bash:3.2
   script:
     - echo "Testing scripts-common with GNU/Bash version 3.2+ (target => some MacOS version)"
-    - su -mc 'scripts-common-tests/tests.sh; cat "$LOG_FILE"' "$USER"
+    - su -mc 'scripts-common-tests/tests.sh; cat "$BSC_LOG_FILE"' "$USER"
 
 
 # Publish coverage report to ease improvement.

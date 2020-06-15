@@ -6,24 +6,27 @@
 # Description: Free common utilities/tool-box for GNU/Bash scripts.
 #
 # Optional variables you can define before sourcing this file:
-#  ROOT_DIR           <path>  root directory to consider when performing various check
-#  TMP_DIR            <path>  temporary directory where various dump files will be created
-#  PID_DIR            <path>  directory where PID files will be created to manage daemon feature
-#  CONFIG_FILE        <path>  path of configuration file to consider
-#  GLOBAL_CONFIG_FILE <path>  path of GLOBAL configuration file to consider (configuration element will be checked in this one, if NOT found in the configuration file)
+#  BSC_ROOT_DIR               <path>  root directory to consider when performing various check
+#  BSC_TMP_DIR                <path>  temporary directory where various dump files are created
+#  BSC_PID_DIR                <path>  directory where PID files are created to manage daemon feature
+#  BSC_CONFIG_FILE            <path>  path of configuration file
+#  BSC_GLOBAL_CONFIG_FILE     <path>  path of GLOBAL configuration file
 #
-#  DEBUG_UTILITIES              0|1  activate debug message (not recommended in production)
-#  VERBOSE                      0|1  activate info message (not recommended in production)
-#  CATEGORY                 <string> the category which prepends all messages
-#  DISABLE_ERROR_TRAP           0|1  disable TRAP on error (recommended only for Tests project where assert leads to 'error')
-#  LOG_CONSOLE_OFF              0|1  disable message output on console
-#  LOG_FILE                   <path> path of the log file
-#  LOG_FILE_APPEND_MODE         0|1  activate append mode, instead of override one
-#  MODE_CHECK_CONFIG   0|1  check ALL configuration and then quit (useful to check all the configuration you want, +/- like a dry run)
-#  BSC_FORCE_COMPAT_MODE        0|1  activate compatibility mode (not recommended in production)
-#
-# N.B.: when using checkAndSetConfig function (see usage), you can get back the corresponding configuration in LAST_READ_CONFIG variable
-#        if it has NOT been found, it is set to $CONFIG_NOT_FOUND.
+#  BSC_DISABLE_ERROR_TRAP       0|1   disable TRAP on error (recommended only for Tests project where assert leads to 'error')
+#  BSC_DEBUG_UTILITIES          0|1   enable Debug mode (not recommended in production)
+#  BSC_FORCE_COMPAT_MODE        0|1   enable compatibility mode (not recommended in production)
+#  BSC_VERBOSE                  0|1   enable Verbose mode, showing INFO messages (not recommended in production)
+#  BSC_CATEGORY             <string>  the category which prepends all messages
+#  BSC_LOG_CONSOLE_OFF          0|1   disable message output on console
+#  BSC_LOG_FILE               <path>  path of the log file
+#  BSC_LOG_FILE_APPEND_MODE     0|1   activate append mode, instead of the default override one
+#  BSC_MODE_CHECK_CONFIG        0|1   check ALL configuration and then quit (useful to check all the configuration you want, +/- like a dry run)
+#  BSC_DAEMON_STOP_TIMEOUT <integer>  timeout (in seconds) before killing a daemon process after stop request
+
+# N.B.:
+#  - when a configuration element is not found in **BSC_CONFIG_FILE**, system checks the **BSC_GLOBAL_CONFIG_FILE**
+#  - when using `checkAndSetConfig` function, you can get result in **BSC_LAST_READ_CONFIG** variable (will be set to *$BSC_CONFIG_NOT_FOUND* if not existing)
+#  - when using `listConfigKeys` or `loadConfigKeyValueList` functions, you can get result in **BSC_LAST_READ_CONFIG_KEY_VALUE_LIST** variable
 
 # You should never have to update this script directly, see README.md file if you need to report an issue requesting more configurability.
 
@@ -40,7 +43,7 @@ set -o errtrace
 
 # shellcheck disable=SC2154
 # Dumps function call in case of error, or when exiting with something else than status 0.
-[ "${DISABLE_ERROR_TRAP:-0}" -eq 0 ] && trap '_status=$?; dumpFuncCall $_status' ERR
+[ "${BSC_DISABLE_ERROR_TRAP:-0}" -eq 0 ] && trap '_status=$?; dumpFuncCall $_status' ERR
 #trap '_status=$?; [ $_status -ne 0 ] && dumpFuncCall $_status' EXIT
 
 # N.B.: since version 2.1, global variable definition are at end of this script
@@ -49,54 +52,53 @@ set -o errtrace
 #########################
 ## Constants
 # Log Levels.
-declare -r LOG_LEVEL_INFO=1
-declare -r LOG_LEVEL_MESSAGE=2
-declare -r LOG_LEVEL_WARNING=3
-declare -r LOG_LEVEL_ERROR=4
+declare -r _BSC_LOG_LEVEL_INFO=1
+declare -r _BSC_LOG_LEVEL_MESSAGE=2
+declare -r _BSC_LOG_LEVEL_WARNING=3
+declare -r _BSC_LOG_LEVEL_ERROR=4
 
 # Configuration element types.
-declare -r CONFIG_NOT_FOUND="CONFIG NOT FOUND"
-declare -r CONFIG_TYPE_PATH=1
-declare -r CONFIG_TYPE_OPTION=2
-declare -r CONFIG_TYPE_BIN=3
-declare -r CONFIG_TYPE_DATA=4
+declare -r BSC_CONFIG_NOT_FOUND="CONFIG NOT FOUND"
+declare -r BSC_CONFIG_TYPE_PATH=1
+declare -r BSC_CONFIG_TYPE_OPTION=2
+declare -r BSC_CONFIG_TYPE_BIN=3
+declare -r BSC_CONFIG_TYPE_DATA=4
 
 ## Error code
 # Default error message code.
-declare -r ERROR_DEFAULT=101
+declare -r BSC_ERROR_DEFAULT=101
 
 # Error code after showing usage.
-declare -r ERROR_USAGE=102
+declare -r BSC_ERROR_USAGE=102
 
 # Command line syntax not respected.
-declare -r ERROR_BAD_CLI=103
+declare -r BSC_ERROR_BAD_CLI=103
 
 # Bad/incomplete environment, like:
 #  - missing Java or Ant
 #  - bad user
 #  - permission issue (e.g. while updating structure)
-declare -r ERROR_ENVIRONMENT=104
+declare -r BSC_ERROR_ENVIRONMENT=104
 
 # Invalid configuration, or path definition.
-declare -r ERROR_CONFIG_VARIOUS=105
-declare -r ERROR_CONFIG_PATH=106
+declare -r BSC_ERROR_CONFIG_VARIOUS=105
+declare -r BSC_ERROR_CONFIG_PATH=106
 
 # Binary or data configured file not found.
-declare -r ERROR_CHECK_BIN=107
-declare -r ERROR_CHECK_CONFIG=108
+declare -r BSC_ERROR_CHECK_BIN=107
+declare -r BSC_ERROR_CHECK_CONFIG=108
 
 # PID Files.
-declare -r ERROR_PID_FILE=120
+declare -r BSC_ERROR_PID_FILE=120
 
 # Timeout (in seconds) when stopping process, before killing it.
-declare -r PROCESS_STOP_TIMEOUT=10
-declare -r DAEMON_OPTION_RUN="-R"
+declare -r BSC_DAEMON_OPTION_RUN="-R"
 
-declare -r DAEMON_ACTION_START="start"
-declare -r DAEMON_ACTION_STATUS="status"
-declare -r DAEMON_ACTION_STOP="stop"
-declare -r DAEMON_ACTION_DAEMON="daemon"
-declare -r DAEMON_ACTION_RUN="run"
+declare -r BSC_DAEMON_ACTION_START="start"
+declare -r BSC_DAEMON_ACTION_STATUS="status"
+declare -r BSC_DAEMON_ACTION_STOP="stop"
+declare -r BSC_DAEMON_ACTION_DAEMON="daemon"
+declare -r BSC_DAEMON_ACTION_RUN="run"
 
 
 #########################
@@ -108,17 +110,17 @@ function dumpFuncCall() {
   local _exitStatus="${1:-?}" _funcNameCount="${#FUNCNAME[@]}"
 
   # Ignores following exit status:
-  #  ERROR_USAGE: used in usage method (error will have already been shown)
-  #  ERROR_BAD_CLI: bad CLI use (error will have already been shown)
-  #  ERROR_INPUT_PROCESS: an error message will be said
-  #  ERROR_CHECK_BIN an error message will be shown
-  #  ERROR_CHECK_CONFIG an error message will be shown
-  [ "$_exitStatus" -eq $ERROR_USAGE ] && return 0
-  [ "$_exitStatus" -eq $ERROR_BAD_CLI ] && return 0
-  [ "$_exitStatus" -eq $ERROR_CHECK_BIN ] && return 0
-  [ "$_exitStatus" -eq $ERROR_CHECK_CONFIG ] && return 0
-  [ "$_exitStatus" -eq $ERROR_CONFIG_VARIOUS ] && return 0
-  [ "$_exitStatus" -eq $ERROR_CONFIG_PATH ] && return 0
+  #  BSC_ERROR_USAGE: used in usage method (error will have already been shown)
+  #  BSC_ERROR_BAD_CLI: bad CLI use (error will have already been shown)
+  #  BSC_ERROR_INPUT_PROCESS: an error message will be said
+  #  BSC_ERROR_CHECK_BIN an error message will be shown
+  #  BSC_ERROR_CHECK_CONFIG an error message will be shown
+  [ "$_exitStatus" -eq $BSC_ERROR_USAGE ] && return 0
+  [ "$_exitStatus" -eq $BSC_ERROR_BAD_CLI ] && return 0
+  [ "$_exitStatus" -eq $BSC_ERROR_CHECK_BIN ] && return 0
+  [ "$_exitStatus" -eq $BSC_ERROR_CHECK_CONFIG ] && return 0
+  [ "$_exitStatus" -eq $BSC_ERROR_CONFIG_VARIOUS ] && return 0
+  [ "$_exitStatus" -eq $BSC_ERROR_CONFIG_PATH ] && return 0
 
   # Ignores the call if the system is currently in _doWriteMessage, in which
   #  case the exit status has been "manually" executed after error message shown.
@@ -146,7 +148,7 @@ function dumpFuncCall() {
 
 # usage: isCheckModeConfigOnly
 function isCheckModeConfigOnly() {
-  [ "$MODE_CHECK_CONFIG" -eq 1 ]
+  [ "$BSC_MODE_CHECK_CONFIG" -eq 1 ]
 }
 
 # usage: isRootUser
@@ -160,20 +162,20 @@ function checkLocale() {
 
   # Checks LANG is defined with UTF-8.
   if [ "$( echo "$LANG" |grep -ci "[.]utf[-]*8" )" -eq 0 ] ; then
-      # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
+      # It is a fatal error but in 'BSC_MODE_CHECK_CONFIG' mode.
       warning "You must update your LANG environment variable to use the UTF-8 charmaps ('${LANG:-NONE}' detected). Until then system will attempt using en_US.UTF-8."
 
       export LANG="en_US.UTF-8"
-      return $ERROR_ENVIRONMENT
+      return $BSC_ERROR_ENVIRONMENT
   fi
 
   # Ensures defined LANG is avaulable on the OS.
   if [ "$( locale -a 2>/dev/null |grep -ci $LANG )" -eq 0 ] && [ "$( locale -a 2>/dev/null |grep -c "${LANG//UTF[-]*8/utf8}" )" -eq 0 ]; then
-    # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
+    # It is a fatal error but in 'BSC_MODE_CHECK_CONFIG' mode.
     warning "Although the current OS locale '$LANG' defines to use the UTF-8 charmaps, it is not available (checked with 'locale -a'). You must install it or update your LANG environment variable. Until then system will attempt using en_US.UTF-8."
 
     export LANG="en_US.UTF-8"
-    return $ERROR_ENVIRONMENT
+    return $BSC_ERROR_ENVIRONMENT
   fi
 
   return 0
@@ -184,7 +186,7 @@ function checkLocale() {
 ## Functions - Logger Feature
 
 # usage: _doWriteMessage <level> <message> <newline> <exit code>
-# <level>: LOG_LEVEL_INFO|LOG_LEVEL_MESSAGE|LOG_LEVEL_WARNING|LOG_LEVEL_ERROR
+# <level>: _BSC_LOG_LEVEL_INFO|_BSC_LOG_LEVEL_MESSAGE|_BSC_LOG_LEVEL_WARNING|_BSC_LOG_LEVEL_ERROR
 # <message>: the message to show
 # <newline>: 0 to stay on same line, 1 to break line
 # <exit code>: the exit code (usually for ERROR message), -1 for NO exit.
@@ -197,38 +199,38 @@ function _doWriteMessage() {
   [ "$( echo "$_newLine" |grep -ce "^[0-9]$" )" -ne 1 ] && _newLine="1"
   [ "$( echo "$_exitCode" |grep -ce "^-*[0-9][0-9]*$" )" -ne 1 ] && _exitCode="-1"
 
-  # Does nothing if INFO message and NOT VERBOSE.
-  [ "$VERBOSE" -eq 0 ] && [ "$_level" = "$LOG_LEVEL_INFO" ] && return 0
+  # Does nothing if INFO message and NOT BSC_VERBOSE.
+  [ "$BSC_VERBOSE" -eq 0 ] && [ "$_level" = "$_BSC_LOG_LEVEL_INFO" ] && return 0
 
   # Manages level.
   _messagePrefix=""
-  [ "$_level" = "$LOG_LEVEL_INFO" ] && _messagePrefix="INFO: "
-  [ "$_level" = "$LOG_LEVEL_WARNING" ] && _messagePrefix="\E[31m\E[4mWARNING\E[0m: "
-  [ "$_level" = "$LOG_LEVEL_ERROR" ] && _messagePrefix="\E[31m\E[4mERROR\E[0m: "
+  [ "$_level" = "$_BSC_LOG_LEVEL_INFO" ] && _messagePrefix="INFO: "
+  [ "$_level" = "$_BSC_LOG_LEVEL_WARNING" ] && _messagePrefix="\E[31m\E[4mWARNING\E[0m: "
+  [ "$_level" = "$_BSC_LOG_LEVEL_ERROR" ] && _messagePrefix="\E[31m\E[4mERROR\E[0m: "
 
   [ "$_newLine" -eq 0 ] && printMessageEnd="" || printMessageEnd="\n"
 
   # Checks if message must be shown on console.
   _timestamp=$( getFormattedDatetime '%Y-%d-%m %H:%M.%S' )
-  if [ "$LOG_CONSOLE_OFF" -eq 0 ]; then
-    printf "%-17s %-15s $_messagePrefix%b$printMessageEnd" "$_timestamp" "[$CATEGORY]" "$_message" |tee -a "$LOG_FILE"
+  if [ "$BSC_LOG_CONSOLE_OFF" -eq 0 ]; then
+    printf "%-17s %-15s $_messagePrefix%b$printMessageEnd" "$_timestamp" "[$BSC_CATEGORY]" "$_message" |tee -a "$BSC_LOG_FILE"
   else
-    printf "%-17s %-15s $_messagePrefix%b$printMessageEnd" "$_timestamp" "[$CATEGORY]" "$_message" >> "$LOG_FILE"
+    printf "%-17s %-15s $_messagePrefix%b$printMessageEnd" "$_timestamp" "[$BSC_CATEGORY]" "$_message" >> "$BSC_LOG_FILE"
   fi
 
   # Manages exit if needed.
   [ "$_exitCode" -eq -1 ] && return 0
-  [ "$ERROR_MESSAGE_EXITS_SCRIPT" -eq 0 ] && return "$_exitCode"
+  [ "$BSC_ERROR_MESSAGE_EXITS_SCRIPT" -eq 0 ] && return "$_exitCode"
   exit "$_exitCode"
 }
 
 # usage: writeOK
 # Utility method aiming only to print "OK", in accordance with logging configuration.
 function writeOK() {
-  if [ "$LOG_CONSOLE_OFF" -eq 0 ]; then
-    printf "OK\n" |tee -a "$LOG_FILE"
+  if [ "$BSC_LOG_CONSOLE_OFF" -eq 0 ]; then
+    printf "OK\n" |tee -a "$BSC_LOG_FILE"
   else
-    printf "OK\n" >> "$LOG_FILE"
+    printf "OK\n" >> "$BSC_LOG_FILE"
   fi
 }
 
@@ -237,43 +239,43 @@ function writeOK() {
 function writeNotFound() {
   local _element="${1:-}"
 
-  if [ "$LOG_CONSOLE_OFF" -eq 0 ]; then
-    printf "'%b' \E[31mNOT FOUND\E[0m\n" "$_element" |tee -a "$LOG_FILE"
+  if [ "$BSC_LOG_CONSOLE_OFF" -eq 0 ]; then
+    printf "'%b' \E[31mNOT FOUND\E[0m\n" "$_element" |tee -a "$BSC_LOG_FILE"
   else
-    printf "'%b' \E[31mNOT FOUND\E[0m\n" "$_element" >> "$LOG_FILE"
+    printf "'%b' \E[31mNOT FOUND\E[0m\n" "$_element" >> "$BSC_LOG_FILE"
   fi
 }
 
 # usage: writeMessage <message>
 # Shows the message, and moves to next line.
 function writeMessage() {
-  _doWriteMessage $LOG_LEVEL_MESSAGE "$1" "${2:-1}" -1
+  _doWriteMessage $_BSC_LOG_LEVEL_MESSAGE "$1" "${2:-1}" -1
 }
 
 # usage: writeMessageSL <message>
 # Shows the message, and stays to same line.
 function writeMessageSL() {
-  _doWriteMessage $LOG_LEVEL_MESSAGE "$1" 0 -1
+  _doWriteMessage $_BSC_LOG_LEVEL_MESSAGE "$1" 0 -1
 }
 
 # usage: info <message> [<0 or 1>]
-# Shows message only if $VERBOSE is ON.
+# Shows message only if $BSC_VERBOSE is ON.
 # Stays on the same line if "0" has been specified
 function info() {
-  _doWriteMessage $LOG_LEVEL_INFO "$1" "${2:-1}"
+  _doWriteMessage $_BSC_LOG_LEVEL_INFO "$1" "${2:-1}"
 }
 
 # usage: warning <message> [<0 or 1>]
 # Shows warning message.
 # Stays on the same line if "0" has been specified
 function warning() {
-  _doWriteMessage $LOG_LEVEL_WARNING "$1" "${2:-1}" >&2
+  _doWriteMessage $_BSC_LOG_LEVEL_WARNING "$1" "${2:-1}" >&2
 }
 
 # usage: errorMessage <message> [<exit code>]
 # Shows error message and exits.
 function errorMessage() {
-  _doWriteMessage $LOG_LEVEL_ERROR "$1" 1 "${2:-$ERROR_DEFAULT}" >&2
+  _doWriteMessage $_BSC_LOG_LEVEL_ERROR "$1" 1 "${2:-$BSC_ERROR_DEFAULT}" >&2
 }
 
 
@@ -282,7 +284,7 @@ function errorMessage() {
 
 # usage: updateStructure <dir path>
 function updateStructure() {
-  mkdir -p "$1" || errorMessage "Unable to create structure pieces (check permissions): $1" $ERROR_ENVIRONMENT
+  mkdir -p "$1" || errorMessage "Unable to create structure pieces (check permissions): $1" $BSC_ERROR_ENVIRONMENT
 }
 
 # usage: isEmptyDirectory <path>
@@ -315,54 +317,54 @@ function isAbsolutePath() {
 
 # usage: checkPath <path>
 function checkPath() {
-  # Informs only if not in 'MODE_CHECK_CONFIG' mode.
+  # Informs only if not in 'BSC_MODE_CHECK_CONFIG' mode.
   ! isCheckModeConfigOnly && info "Checking path '$1' ... "
 
   # Checks if the path exists.
   [ -e "$1" ] && return 0
 
-  # It is not the case, if NOT in 'MODE_CHECK_CONFIG' mode, it is a fatal error.
-  ! isCheckModeConfigOnly && errorMessage "Unable to find '$1'." $ERROR_CHECK_CONFIG
+  # It is not the case, if NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error.
+  ! isCheckModeConfigOnly && errorMessage "Unable to find '$1'." $BSC_ERROR_CHECK_CONFIG
   # Otherwise, simple returns an error code.
-  return $ERROR_CHECK_CONFIG
+  return $BSC_ERROR_CHECK_CONFIG
 }
 
 # usage: checkBin <binary name/path>
 function checkBin() {
   local _binary="$1"
 
-  # Informs only if not in 'MODE_CHECK_CONFIG' mode.
+  # Informs only if not in 'BSC_MODE_CHECK_CONFIG' mode.
   ! isCheckModeConfigOnly && info "Checking binary '$1' ... "
 
   # Checks if the binary is available.
   command -v "$_binary" >/dev/null 2>&1 && return 0
 
-  # It is not the case, if NOT in 'MODE_CHECK_CONFIG' mode, it is a fatal error.
-  ! isCheckModeConfigOnly && errorMessage "Unable to find binary '$_binary'." $ERROR_CHECK_BIN
+  # It is not the case, if NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error.
+  ! isCheckModeConfigOnly && errorMessage "Unable to find binary '$_binary'." $BSC_ERROR_CHECK_BIN
   # Otherwise, simple returns an error code.
-  return $ERROR_CHECK_BIN
+  return $BSC_ERROR_CHECK_BIN
 }
 
 # usage: checkDataFile <data file path>
 function checkDataFile() {
-  # Informs only if not in 'MODE_CHECK_CONFIG' mode.
+  # Informs only if not in 'BSC_MODE_CHECK_CONFIG' mode.
   ! isCheckModeConfigOnly && info "Checking data file '$1' ... "
 
   # Checks if the file exists.
   [ -f "$1" ] && return 0
 
-  # It is not the case, if NOT in 'MODE_CHECK_CONFIG' mode, it is a fatal error.
-  ! isCheckModeConfigOnly && errorMessage "Unable to find data file '$1'." $ERROR_CHECK_CONFIG
+  # It is not the case, if NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error.
+  ! isCheckModeConfigOnly && errorMessage "Unable to find data file '$1'." $BSC_ERROR_CHECK_CONFIG
   # Otherwise, simple returns an error code.
-  return $ERROR_CHECK_CONFIG
+  return $BSC_ERROR_CHECK_CONFIG
 }
 
 # usage: buildCompletePath <path> [<path to prepend> <force prepend>]
 # <path to prepend>: the path to prepend if the path is NOT absolute and NOT simple.
-# Defaut <path to prepend> is $ROOT_DIR
+# Defaut <path to prepend> is $BSC_ROOT_DIR
 # <force prepend>: 0=disabled (default), 1=force prepend for "single path" (useful for data file)
 function buildCompletePath() {
-  local _path _pathToPreprend="${2:-${ROOT_DIR:-$DEFAULT_ROOT_DIR}}" _forcePrepend="${3:-0}"
+  local _path _pathToPreprend="${2:-$BSC_ROOT_DIR}" _forcePrepend="${3:-0}"
   _path="$( pruneSlash "$1" )"
 
   # Replaces potential '~' character.
@@ -381,7 +383,7 @@ function buildCompletePath() {
 # usage: checkAndFormatPath <paths> [<path to prepend>]
 # ALL paths must be specified if a single parameter, separated by colon ':'.
 function checkAndFormatPath() {
-  local _paths="$1" _pathToPreprend="${2:-${ROOT_DIR:-$DEFAULT_ROOT_DIR}}"
+  local _paths="$1" _pathToPreprend="${2:-$BSC_ROOT_DIR}"
 
   formattedPath=""
   while IFS= read -r -d ':' pathToCheck; do
@@ -394,7 +396,7 @@ function checkAndFormatPath() {
       completePath="$( ls -d "$( eval echo "$formattedWildcard" )" 2>/dev/null )" || writeNotFound
     fi
 
-    # Checks if it exists, if 'MODE_CHECK_CONFIG' mode.
+    # Checks if it exists, if 'BSC_MODE_CHECK_CONFIG' mode.
     if isCheckModeConfigOnly; then
       writeMessageSL "Checking path '$pathToCheck' ... "
       if [ -d "$completePath" ]; then
@@ -426,7 +428,7 @@ function doListConfigKeyValues() {
 }
 
 # Loads available configuration <key, value> (merging global and user configuration files).
-# Result will then be available in global associative array named $LAST_READ_CONFIG_KEY_VALUE_LIST.
+# Result will then be available in global associative array named $BSC_LAST_READ_CONFIG_KEY_VALUE_LIST.
 #
 # usage: loadConfigKeyValueList [<search pattern>] [<key remove pattern>]
 # <search pattern>: optional regular expression of keys to consider (by default ALL configuration will be considered)
@@ -437,24 +439,24 @@ function loadConfigKeyValueList() {
   # Compatibility safe-guard.
   if [ "${BSC_FORCE_COMPAT_MODE:-${_BSC_COMPAT_ASSOCIATIVE_ARRAY:-0}}" -eq 0 ]; then
     # This feature can only work with associative array.
-    LAST_READ_CONFIG_KEY_VALUE_LIST="Your GNU/Bash version '$BASH_VERSION' does not support associative array."
+    BSC_LAST_READ_CONFIG_KEY_VALUE_LIST="Your GNU/Bash version '$BASH_VERSION' does not support associative array."
     return
   fi
 
-  declare -gA LAST_READ_CONFIG_KEY_VALUE_LIST=() # [re]init associative global array
+  declare -gA BSC_LAST_READ_CONFIG_KEY_VALUE_LIST=() # [re]init associative global array
 
   # Reads all configuration key from global configuration file if any.
-  if [ -f "${GLOBAL_CONFIG_FILE:-$DEFAULT_GLOBAL_CONFIG_FILE}" ]; then
+  if [ -f "$BSC_GLOBAL_CONFIG_FILE" ]; then
     while IFS='=' read -r configKey configValue; do
-      LAST_READ_CONFIG_KEY_VALUE_LIST["${configKey//$_keyRemovePattern/}"]="${configValue//\"/}"
-    done < <( doListConfigKeyValues "${GLOBAL_CONFIG_FILE:-$DEFAULT_GLOBAL_CONFIG_FILE}" "$_searchPattern" )
+      BSC_LAST_READ_CONFIG_KEY_VALUE_LIST["${configKey//$_keyRemovePattern/}"]="${configValue//\"/}"
+    done < <( doListConfigKeyValues "$BSC_GLOBAL_CONFIG_FILE" "$_searchPattern" )
   fi
 
   # Reads all configuration key from user configuration file if any.
-  if [ -f "${CONFIG_FILE:-$DEFAULT_CONFIG_FILE}" ]; then
+  if [ -f "$BSC_CONFIG_FILE" ]; then
     while IFS='=' read -r configKey configValue; do
-      LAST_READ_CONFIG_KEY_VALUE_LIST["${configKey//$_keyRemovePattern/}"]="${configValue//\"/}"
-    done < <( doListConfigKeyValues "${CONFIG_FILE:-$DEFAULT_CONFIG_FILE}" "$_searchPattern" )
+      BSC_LAST_READ_CONFIG_KEY_VALUE_LIST["${configKey//$_keyRemovePattern/}"]="${configValue//\"/}"
+    done < <( doListConfigKeyValues "$BSC_CONFIG_FILE" "$_searchPattern" )
   fi
 }
 
@@ -464,7 +466,7 @@ function listConfigKeys() {
   local _pattern="${1:-.*}"
 
   loadConfigKeyValueList "$_pattern"
-  echo "${!LAST_READ_CONFIG_KEY_VALUE_LIST[@]}"
+  echo "${!BSC_LAST_READ_CONFIG_KEY_VALUE_LIST[@]}"
 }
 
 # usage: checkConfigValue <configuration file> <config key>
@@ -474,7 +476,7 @@ function checkConfigValue() {
   #  and 'global' configuration file does not exists for only-standard user installation.
   if [ ! -f "$_configFile" ]; then
     # IMPORTANT: be careful not to print something in the standard output or it would break the checkAndSetConfig feature.
-    [ "$DEBUG_UTILITIES" -eq 1 ] && printf "Configuration file '%b' not found ... " "$_configFile" >&2
+    [ "$BSC_DEBUG_UTILITIES" -eq 1 ] && printf "Configuration file '%b' not found ... " "$_configFile" >&2
     return 1
   fi
 
@@ -486,15 +488,15 @@ function getConfigValue() {
   local _configKey="$1"
 
   # Checks in use configuration file.
-  configFileToRead="${CONFIG_FILE:-$DEFAULT_CONFIG_FILE}"
+  configFileToRead="$BSC_CONFIG_FILE"
   if ! checkConfigValue "$configFileToRead" "$_configKey"; then
     # Checks in global configuration file.
-    configFileToRead="${GLOBAL_CONFIG_FILE:-$DEFAULT_GLOBAL_CONFIG_FILE}"
+    configFileToRead="$BSC_GLOBAL_CONFIG_FILE"
     if ! checkConfigValue "$configFileToRead" "$_configKey"; then
       # Prints error message (and exit) only if NOT in "check config and quit" mode.
-      ! isCheckModeConfigOnly && errorMessage "Configuration key '$_configKey' NOT found in any of configuration files" $ERROR_CONFIG_VARIOUS
-      [ "$DEBUG_UTILITIES" -eq 1 ] && printf "configuration key '%b' \E[31mNOT FOUND\E[0m in any of configuration files" "$_configKey"
-      return $ERROR_CONFIG_VARIOUS
+      ! isCheckModeConfigOnly && errorMessage "Configuration key '$_configKey' NOT found in any of configuration files" $BSC_ERROR_CONFIG_VARIOUS
+      [ "$BSC_DEBUG_UTILITIES" -eq 1 ] && printf "configuration key '%b' \E[31mNOT FOUND\E[0m in any of configuration files" "$_configKey"
+      return $BSC_ERROR_CONFIG_VARIOUS
     fi
   fi
 
@@ -507,17 +509,17 @@ function getConfigValue() {
 # usage: checkAndGetConfig <config key> <config type> [<path to prepend>] [<toggle: must exist>]
 # <config key>: the full config key corresponding to configuration element in configuration file
 # <config type>: the type of config among
-#   $CONFIG_TYPE_PATH: path -> path existence will be checked
-#   $CONFIG_TYPE_OPTION: options -> nothing more will be done
-#   $CONFIG_TYPE_BIN: binary -> system will ensure binary path is available
-#   $CONFIG_TYPE_DATA: data -> data file path existence will be checked
-# <path to prepend>: (only for type $CONFIG_TYPE_BIN and $CONFIG_TYPE_DATA) the path to prepend if
-#  the path is NOT absolute and NOT simple. Defaut <path to prepend> is $ROOT_DIR
-# <toggle: must exist>: only for CONFIG_TYPE_PATH; 1 (default) if path must exist, 0 otherwise.
-# If all is OK, it defined the LAST_READ_CONFIG variable with the requested configuration element.
+#   $BSC_CONFIG_TYPE_PATH: path -> path existence will be checked
+#   $BSC_CONFIG_TYPE_OPTION: options -> nothing more will be done
+#   $BSC_CONFIG_TYPE_BIN: binary -> system will ensure binary path is available
+#   $BSC_CONFIG_TYPE_DATA: data -> data file path existence will be checked
+# <path to prepend>: (only for type $BSC_CONFIG_TYPE_BIN and $BSC_CONFIG_TYPE_DATA) the path to prepend if
+#  the path is NOT absolute and NOT simple. Defaut <path to prepend> is $BSC_ROOT_DIR
+# <toggle: must exist>: only for BSC_CONFIG_TYPE_PATH; 1 (default) if path must exist, 0 otherwise.
+# If all is OK, it defined the BSC_LAST_READ_CONFIG variable with the requested configuration element.
 function checkAndSetConfig() {
-  local _configKey="$1" _configType="$2" _pathToPreprend="${3:-${ROOT_DIR:-$DEFAULT_ROOT_DIR}}" _pathMustExist="${4:-1}"
-  export LAST_READ_CONFIG="$CONFIG_NOT_FOUND" # reinit global variable.
+  local _configKey="$1" _configType="$2" _pathToPreprend="${3:-$BSC_ROOT_DIR}" _pathMustExist="${4:-1}"
+  export BSC_LAST_READ_CONFIG="$BSC_CONFIG_NOT_FOUND" # reinit global variable.
 
   [ -z "$_configKey" ] && errorMessage "checkAndSetConfig function badly used (configuration key not specified)"
   [ -z "$_configType" ] && errorMessage "checkAndSetConfig function badly used (configuration type not specified)"
@@ -525,8 +527,8 @@ function checkAndSetConfig() {
   local _message="Checking '$_configKey' ... "
 
   # Informs about config key to check, according to situation:
-  #  - in 'normal' mode, message is only shown in VERBOSE mode
-  #  - in 'MODE_CHECK_CONFIG' mode, message is always shown
+  #  - in 'normal' mode, message is only shown in BSC_VERBOSE mode
+  #  - in 'BSC_MODE_CHECK_CONFIG' mode, message is always shown
   if ! isCheckModeConfigOnly; then
     info "$_message"
   else
@@ -538,8 +540,8 @@ function checkAndSetConfig() {
   valueGetStatus=$?
   if [ $valueGetStatus -ne 0 ]; then
     # Prints error message if any.
-    [ -n "$_value" ] && echo -e "$_value" |tee -a "$LOG_FILE"
-    # If NOT in 'MODE_CHECK_CONFIG' mode, it is a fatal error, so exists.
+    [ -n "$_value" ] && echo -e "$_value" |tee -a "$BSC_LOG_FILE"
+    # If NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error, so exists.
     ! isCheckModeConfigOnly && exit $valueGetStatus
     # Otherwise, simply returns an error status.
     return $valueGetStatus
@@ -547,17 +549,17 @@ function checkAndSetConfig() {
 
   # Manages path if needed (it is the case for PATH, BIN and DATA).
   checkPathStatus=0
-  if [ "$_configType" -ne $CONFIG_TYPE_OPTION ]; then
-    [ "$_configType" -ne $CONFIG_TYPE_BIN ] && forcePrepend=1 || forcePrepend=0
+  if [ "$_configType" -ne $BSC_CONFIG_TYPE_OPTION ]; then
+    [ "$_configType" -ne $BSC_CONFIG_TYPE_BIN ] && forcePrepend=1 || forcePrepend=0
     _value=$( buildCompletePath "$_value" "$_pathToPreprend" $forcePrepend )
 
-    if [ "$_configType" -eq $CONFIG_TYPE_PATH ] && [ "$_pathMustExist" -eq 1 ]; then
+    if [ "$_configType" -eq $BSC_CONFIG_TYPE_PATH ] && [ "$_pathMustExist" -eq 1 ]; then
       checkPath "$_value"
       checkPathStatus=$?
-    elif [ "$_configType" -eq $CONFIG_TYPE_BIN ]; then
+    elif [ "$_configType" -eq $BSC_CONFIG_TYPE_BIN ]; then
       checkBin "$_value"
       checkPathStatus=$?
-    elif [ "$_configType" -eq $CONFIG_TYPE_DATA ]; then
+    elif [ "$_configType" -eq $BSC_CONFIG_TYPE_DATA ]; then
       checkDataFile "$_value"
       checkPathStatus=$?
     fi
@@ -565,7 +567,7 @@ function checkAndSetConfig() {
 
   # Ensures path check has been successfully done.
   if [ $checkPathStatus -ne 0 ]; then
-    # If NOT in 'MODE_CHECK_CONFIG' mode, it is a fatal error, so exits.
+    # If NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error, so exits.
     ! isCheckModeConfigOnly && exit $checkPathStatus
     # Otherwise, show an error message, and simply returns an error status.
     writeNotFound "$_value"
@@ -576,7 +578,7 @@ function checkAndSetConfig() {
   isCheckModeConfigOnly && writeOK
 
   # Sets the global variable
-  export LAST_READ_CONFIG="$_value"
+  export BSC_LAST_READ_CONFIG="$_value"
   return 0
 }
 
@@ -602,9 +604,9 @@ function getDetailedVersion() {
 
   # General version is given by the specified $_majorVersion.
   # Before all, trying to get precise version in case of source code version.
-  lastCommit=$( cd "$_installDir" >/dev/null 2>&1 || exit $ERROR_ENVIRONMENT; \
+  lastCommit=$( cd "$_installDir" >/dev/null 2>&1 || exit $BSC_ERROR_ENVIRONMENT; \
                 LANG=C git log -1 --abbrev-commit --date=short 2>&1 |grep -wE "commit|Date" |sed -e 's/Date:. / of/' |tr -d '\n' ) \
-              || return $ERROR_ENVIRONMENT
+              || return $BSC_ERROR_ENVIRONMENT
 
   # Manages the commit Hash.
   [ -n "$lastCommit" ] && lastCommit=" ($lastCommit)"
@@ -624,8 +626,8 @@ function isVersionGreater() {
   local _version1="$1" _version2="$2" _orEquals="${3:-0}"
 
   # Safeguard - ensures syntax is respected.
-  [ "$( echo "$_version1" |grep -ce "^[0-9][0-9.]*$" )" -eq 1 ] || errorMessage "Unable to compare version because version '$_version1' does not fit the syntax (digits separated by dot)" $ERROR_ENVIRONMENT
-  [ "$( echo "$_version2" |grep -ce "^[0-9][0-9.]*$" )" -eq 1 ] || errorMessage "Unable to compare version because version '$_version2' does not fit the syntax (digits separated by dot)" $ERROR_ENVIRONMENT
+  [ "$( echo "$_version1" |grep -ce "^[0-9][0-9.]*$" )" -eq 1 ] || errorMessage "Unable to compare version because version '$_version1' does not fit the syntax (digits separated by dot)" $BSC_ERROR_ENVIRONMENT
+  [ "$( echo "$_version2" |grep -ce "^[0-9][0-9.]*$" )" -eq 1 ] || errorMessage "Unable to compare version because version '$_version2' does not fit the syntax (digits separated by dot)" $BSC_ERROR_ENVIRONMENT
 
   # Checks if the version are equals (in which case the first one is NOT greater than the second).
   [[ "$_version1" == "$_version2" ]] && return $((_orEquals-1))
@@ -676,21 +678,21 @@ function getFormattedDatetime() {
 
 # usage: initializeUptime
 function initializeStartTime() {
-  getFormattedDatetime '%s' > "${TIME_FILE:-$DEFAULT_TIME_FILE}"
+  getFormattedDatetime '%s' > "$BSC_TIME_FILE"
 }
 
 # usage: finalizeStartTime
 function finalizeStartTime() {
-  rm -f "${TIME_FILE:-$DEFAULT_TIME_FILE}"
+  rm -f "$BSC_TIME_FILE"
 }
 
 # usage: getUptime
 function getUptime() {
   local _currentTime _startTime _uptime
-  [ ! -f "${TIME_FILE:-$DEFAULT_TIME_FILE}" ] && echo "not started" && exit 0
+  [ ! -f "$BSC_TIME_FILE" ] && echo "not started" && exit 0
 
   _currentTime=$( getFormattedDatetime '%s' )
-  _startTime=$( <"${TIME_FILE:-$DEFAULT_TIME_FILE}" )
+  _startTime=$( <"$BSC_TIME_FILE" )
   _uptime=$((_currentTime - _startTime))
 
   printf "%02dd %02dh:%02dm.%02ds" $((_uptime/86400)) $((_uptime%86400/3600)) $((_uptime%3600/60)) $((_uptime%60))
@@ -780,7 +782,7 @@ function extractNumberSequence() {
   _result=$( sed -e 's/^[^0-9]*\([sS]*[0-9][0-9]*\)[ \t]*[-aàep&][ \te0]*\([1-9][0-9]*\)[^0-9]*$/\1-\2/ig;' <<< "$_string" \
             |sed -e 's/^[^0-9]*\([0-9]-*[0-9]*\)[^0-9]*$/\1/g;')
 
-  [ "$DEBUG_UTILITIES" -eq 1 ] && printf "Extracted number sequence from name '%b' => '%b'" "$_string" "$_result" >&2
+  [ "$BSC_DEBUG_UTILITIES" -eq 1 ] && printf "Extracted number sequence from name '%b' => '%b'" "$_string" "$_result" >&2
 
   # Returns the number sequence.
   echo "$_result"
@@ -796,10 +798,10 @@ function writePIDFile() {
   # Safe-guard.
   if [ -f "$_pidFile" ]; then
     errorMessage "PID file '$_pidFile' already exists." -1
-    return $ERROR_PID_FILE
+    return $BSC_ERROR_PID_FILE
   fi
 
-  ! updateStructure "$( dirname "$_pidFile" )" && errorMessage "Unable to create parent directory of PID file '$_pidFile'." $ERROR_ENVIRONMENT
+  ! updateStructure "$( dirname "$_pidFile" )" && errorMessage "Unable to create parent directory of PID file '$_pidFile'." $BSC_ERROR_ENVIRONMENT
 
   echo "processName=$_processName" > "$_pidFile"
   echo "pid=$$" >> "$_pidFile"
@@ -818,11 +820,11 @@ function doExtractInfoFromPIDFile() {
   local _pidFile="$1" _info="$2" _pidToCheck
 
   # Checks if PID file exists, otherwise regard process as NOT running.
-  [ ! -f "$_pidFile" ] && errorMessage "PID file '$_pidFile' not found." -1 && return $ERROR_PID_FILE
+  [ ! -f "$_pidFile" ] && errorMessage "PID file '$_pidFile' not found." -1 && return $BSC_ERROR_PID_FILE
 
   # Gets PID from file, and ensures it is defined.
   _pidToCheck=$( grep -e "^$_info=" "$_pidFile" |head -n 1 |sed -e 's/^[^=]*=//' )
-  [ -z "$_pidToCheck" ] && errorMessage "PID file '$_pidFile' empty." -1 && return $ERROR_PID_FILE
+  [ -z "$_pidToCheck" ] && errorMessage "PID file '$_pidFile' empty." -1 && return $BSC_ERROR_PID_FILE
 
   # Writes it.
   echo "$_pidToCheck" && return 0
@@ -871,7 +873,7 @@ function isRunningProcess() {
 # Checks all existing PID files, checks if corresponding process are still running,
 #  and deletes PID files if it is not the case.
 function checkAllProcessFromPIDFiles() {
-  local _pidDir="${1:-${PID_DIR:-$DEFAULT_PID_DIR}}"
+  local _pidDir="${1:-$BSC_PID_DIR}"
 
   info "Check any existing PID file in '$_pidDir' (and clean if corresponding process is no more running)."
   # For any existing PID file.
@@ -900,8 +902,8 @@ function startProcess() {
   ## Writes the PID file.
   writePIDFile "$_pidFile" "$_processName" || return 1
 
-  ## If LOG_CONSOLE_OFF is not already defined, messages must only be written in log file (no more on console).
-  [ -z "$LOG_CONSOLE_OFF" ] && export LOG_CONSOLE_OFF=1
+  ## If BSC_LOG_CONSOLE_OFF is not already defined, messages must only be written in log file (no more on console).
+  [ -z "$BSC_LOG_CONSOLE_OFF" ] && export BSC_LOG_CONSOLE_OFF=1
 
   ## Executes the specified command -> such a way the command WILL have the PID written in the file.
   info "Starting background command: $_processName ${_options[*]}"
@@ -924,8 +926,8 @@ function stopProcess() {
   kill -s TERM "$pidToStop" || return 1
 
   # Waits until process stops, or timeout is reached.
-  remainingTime=$PROCESS_STOP_TIMEOUT
-  while [ $remainingTime -gt 0 ] && isRunningProcess "$_pidFile" "$_processName"; do
+  remainingTime=$BSC_DAEMON_STOP_TIMEOUT
+  while [ "$remainingTime" -gt 0 ] && isRunningProcess "$_pidFile" "$_processName"; do
     # Waits 1 second.
     sleep 1
     (( remainingTime-- ))
@@ -975,7 +977,7 @@ function manageDaemon() {
   local _logFile="$5" _outputFile="$6"
 
   case "$_action" in
-    $DAEMON_ACTION_DAEMON)
+    $BSC_DAEMON_ACTION_DAEMON)
       # Reads all optional remaining parameters as an options array.
       shift 6
       _options=("$@")
@@ -983,23 +985,23 @@ function manageDaemon() {
       # If the option is NOT the special one which activates last action "run"; setups trap ensuring
       # children process will be stopped in same time this main process is stopped, otherwise it will
       # setup when managing the run action.
-      [[ "${_options[*]}" != "$DAEMON_OPTION_RUN" ]] && setUpKillChildTrap "$_processName"
+      [[ "${_options[*]}" != "$BSC_DAEMON_OPTION_RUN" ]] && setUpKillChildTrap "$_processName"
 
       # Starts the process.
       # N.B.: here we WANT word splitting on $_options, so we don't put quotes.
       startProcess "$_pidFile" "$_processName" "${_options[@]}"
     ;;
 
-    $DAEMON_ACTION_START)
+    $BSC_DAEMON_ACTION_START)
       # Ensures it is not already running.
       isRunningProcess "$_pidFile" "$_processName" && writeMessage "$_name is already running." && return 0
 
       # Starts it, launching this script in daemon mode.
-      LOG_FILE="$_logFile" LOG_CONSOLE_OFF=${LOG_CONSOLE_OFF:-1} "$0" -D >>"$_outputFile" &
+      BSC_LOG_FILE="$_logFile" BSC_LOG_CONSOLE_OFF=${BSC_LOG_CONSOLE_OFF:-1} "$0" -D >>"$_outputFile" &
       writeMessage "Launched $_name."
     ;;
 
-    $DAEMON_ACTION_STATUS)
+    $BSC_DAEMON_ACTION_STATUS)
       if isRunningProcess "$_pidFile" "$_processName"; then
         writeMessage "$_name is running."
       else
@@ -1007,7 +1009,7 @@ function manageDaemon() {
       fi
     ;;
 
-    $DAEMON_ACTION_STOP)
+    $BSC_DAEMON_ACTION_STOP)
       # Checks if it is running.
       ! isRunningProcess "$_pidFile" "$_processName" && writeMessage "$_name is NOT running." && return 0
 
@@ -1016,9 +1018,9 @@ function manageDaemon() {
       writeMessage "Stopped $_name."
     ;;
 
-    $DAEMON_ACTION_RUN)
-      ## If LOG_CONSOLE_OFF is not already defined, messages must only be written in log file (no more on console).
-      [ -z "$LOG_CONSOLE_OFF" ] && export LOG_CONSOLE_OFF=1
+    $BSC_DAEMON_ACTION_RUN)
+      ## If BSC_LOG_CONSOLE_OFF is not already defined, messages must only be written in log file (no more on console).
+      [ -z "$BSC_LOG_CONSOLE_OFF" ] && export BSC_LOG_CONSOLE_OFF=1
 
       # Setups trap ensuring children process will be stopped in same time this main process is stopped.
       setUpKillChildTrap "$_processName"
@@ -1040,7 +1042,7 @@ function daemonUsage() {
   echo -e "-h\tshow this usage"
   echo -e "\nYou must either start, status or stop the $_name daemon."
 
-  exit $ERROR_USAGE
+  exit $BSC_ERROR_USAGE
 }
 
 
@@ -1055,13 +1057,13 @@ function _manageThidPartyToolHome() {
   # Checks if environment variable is defined.
   if [ -z "${!_envVarName:-}" ]; then
     # Checks if it is defined in configuration file.
-    checkAndSetConfig "$_configKey" "$CONFIG_TYPE_OPTION"
-    declare -r toolHome="$LAST_READ_CONFIG"
-    if [ -z "$toolHome" ] || [[ "$toolHome" == "$CONFIG_NOT_FOUND" ]]; then
-      # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
+    checkAndSetConfig "$_configKey" "$BSC_CONFIG_TYPE_OPTION"
+    declare -r toolHome="$BSC_LAST_READ_CONFIG"
+    if [ -z "$toolHome" ] || [[ "$toolHome" == "$BSC_CONFIG_NOT_FOUND" ]]; then
+      # It is a fatal error but in 'BSC_MODE_CHECK_CONFIG' mode.
       local _errorMessage="You must either configure '$_envVarName' environment variable or '$_configKey' configuration element."
-      ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_ENVIRONMENT
-      warning "$_errorMessage" && return $ERROR_ENVIRONMENT
+      ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $BSC_ERROR_ENVIRONMENT
+      warning "$_errorMessage" && return $BSC_ERROR_ENVIRONMENT
     fi
 
     # Ensures it exists.
@@ -1073,9 +1075,9 @@ function _manageThidPartyToolHome() {
     fi
 
     if [ -n "$_errorMessage" ]; then
-      # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
-      ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_CONFIG_VARIOUS
-      warning "$_errorMessage" && return $ERROR_CONFIG_VARIOUS
+      # It is a fatal error but in 'BSC_MODE_CHECK_CONFIG' mode.
+      ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $BSC_ERROR_CONFIG_VARIOUS
+      warning "$_errorMessage" && return $BSC_ERROR_CONFIG_VARIOUS
     fi
 
     export "$_envVarName"="$toolHome"
@@ -1092,9 +1094,9 @@ function _manageThidPartyToolHome() {
   done <<<"$_binPathToCheck"
 
   if [ -n "$_errorMessage" ]; then
-    # It is a fatal error but in 'MODE_CHECK_CONFIG' mode.
-    ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $ERROR_CONFIG_VARIOUS
-    warning "$_errorMessage" && return $ERROR_CONFIG_VARIOUS
+    # It is a fatal error but in 'BSC_MODE_CHECK_CONFIG' mode.
+    ! isCheckModeConfigOnly && errorMessage "$_errorMessage" $BSC_ERROR_CONFIG_VARIOUS
+    warning "$_errorMessage" && return $BSC_ERROR_CONFIG_VARIOUS
   fi
 }
 
@@ -1109,19 +1111,19 @@ function _manageThidPartyToolHome() {
 
 # usage: manageJavaHome
 function manageJavaHome() {
-  _manageThidPartyToolHome "a Java Development Kit" "JAVA_HOME" "environment.java.home" "bin/java|bin/javac" || return $ERROR_CONFIG_VARIOUS
+  _manageThidPartyToolHome "a Java Development Kit" "JAVA_HOME" "environment.java.home" "bin/java|bin/javac" || return $BSC_ERROR_CONFIG_VARIOUS
   writeMessage "Found: $( "$JAVA_HOME/bin/java" -version 2>&1|head -n 2| sed -e 's/$/ [/;' |tr -d '\n' |sed -e 's/..$/]/' )"
 }
 
 # usage: manageAntHome
 function manageAntHome() {
-  _manageThidPartyToolHome "an installation of Apache Ant" "ANT_HOME" "environment.ant.home" "bin/ant" || return $ERROR_CONFIG_VARIOUS
+  _manageThidPartyToolHome "an installation of Apache Ant" "ANT_HOME" "environment.ant.home" "bin/ant" || return $BSC_ERROR_CONFIG_VARIOUS
   writeMessage "Found: $( "$ANT_HOME/bin/ant" -v 2>&1|head -n 1 )"
 }
 
 # usage: manageMavenHome
 function manageMavenHome() {
-  _manageThidPartyToolHome "an installation of Apache Maven" "M2_HOME" "environment.maven.home" "bin/mvn" || return $ERROR_CONFIG_VARIOUS
+  _manageThidPartyToolHome "an installation of Apache Maven" "M2_HOME" "environment.maven.home" "bin/mvn" || return $BSC_ERROR_CONFIG_VARIOUS
   writeMessage "Found: $( "$M2_HOME/bin/mvn" -v 2>&1|head -n 1 )"
 }
 
@@ -1139,38 +1141,56 @@ fi
 #########################
 ## Default variables' values
 launchedScriptName="$( basename "$0" )"
-declare -r DEFAULT_ROOT_DIR="${DEFAULT_ROOT_DIR:-${HOME:-/home/$( whoami )}/$launchedScriptName}"
-declare -r DEFAULT_TMP_DIR="${TMP_DIR:-/tmp/$( getFormattedDatetime '%Y-%m-%d-%H-%M-%S' )-$launchedScriptName}"
-declare -r DEFAULT_LOG_FILE="${DEFAULT_LOG_FILE:-$DEFAULT_TMP_DIR/logFile.log}"
-declare -r DEFAULT_TIME_FILE="$DEFAULT_TMP_DIR/timeFile"
+declare -r _BSC_DEFAULT_ROOT_DIR="${_BSC_DEFAULT_ROOT_DIR:-${HOME:-/home/$( whoami )}/$launchedScriptName}"
+declare -r _BSC_DEFAULT_TMP_DIR="${BSC_TMP_DIR:-/tmp/$( getFormattedDatetime '%Y-%m-%d-%H-%M-%S' )-$launchedScriptName}"
+declare -r _BSC_DEFAULT_PID_DIR="$_BSC_DEFAULT_TMP_DIR/_pids"
 
-declare -r DEFAULT_CONFIG_FILE="$DEFAULT_ROOT_DIR/.config/$launchedScriptName.conf"
-declare -r DEFAULT_GLOBAL_CONFIG_FILE="/etc/$launchedScriptName.conf"
-declare -r DEFAULT_PID_DIR="$DEFAULT_TMP_DIR/_pids"
+declare -r _BSC_DEFAULT_LOG_FILE="${_BSC_DEFAULT_LOG_FILE:-$_BSC_DEFAULT_TMP_DIR/logFile.log}"
+declare -r _BSC_DEFAULT_CONFIG_FILE="$_BSC_DEFAULT_ROOT_DIR/.config/$launchedScriptName.conf"
+declare -r _BSC_DEFAULT_GLOBAL_CONFIG_FILE="/etc/$launchedScriptName.conf"
+declare -r _BSC_DEFAULT_TIME_FILE="$_BSC_DEFAULT_TMP_DIR/timeFile"
 
-updateStructure "$DEFAULT_PID_DIR"
+declare -r _BSC_DEFAULT_DAEMON_STOP_TIMEOUT=16
+
+updateStructure "$_BSC_DEFAULT_PID_DIR"
 
 #########################
 ## Global variables
-DEBUG_UTILITIES=${DEBUG_UTILITIES:-0}
-VERBOSE=${VERBOSE:-$DEBUG_UTILITIES}
-# special toggle defining if system must quit after configuration check (activate when using -X option of scripts)
-MODE_CHECK_CONFIG=${MODE_CHECK_CONFIG:-0}
-# Defines default CATEGORY if not already defined.
-CATEGORY=${CATEGORY:-general}
+# Defines various directory path, if not already defined by caller.
+BSC_ROOT_DIR=${BSC_ROOT_DIR:-$_BSC_DEFAULT_ROOT_DIR}
+BSC_TMP_DIR=${BSC_TMP_DIR:-$_BSC_DEFAULT_TMP_DIR}
+BSC_PID_DIR=${BSC_PID_DIR:-$_BSC_DEFAULT_PID_DIR}
+
+# Defines various file path, if not already defined by caller.
+BSC_LOG_FILE=${BSC_LOG_FILE:-$_BSC_DEFAULT_LOG_FILE}
+BSC_CONFIG_FILE=${BSC_CONFIG_FILE:-$_BSC_DEFAULT_CONFIG_FILE}
+BSC_GLOBAL_CONFIG_FILE=${BSC_GLOBAL_CONFIG_FILE:-$_BSC_DEFAULT_GLOBAL_CONFIG_FILE}
+BSC_TIME_FILE=${BSC_TIME_FILE:-$_BSC_DEFAULT_TIME_FILE}
+
+# Defines the daemon timeout when requesting its stop, before killing it.
+BSC_DAEMON_STOP_TIMEOUT=${BSC_DAEMON_STOP_TIMEOUT:-$_BSC_DEFAULT_DAEMON_STOP_TIMEOUT}
+
+# By default Debug mode is Off.
+BSC_DEBUG_UTILITIES=${BSC_DEBUG_UTILITIES:-0}
+
+# By default Verbose mode is Off, it is automatically switched on if Debug mode is On.
+BSC_VERBOSE=${BSC_VERBOSE:-$BSC_DEBUG_UTILITIES}
+
+# Defines if configuration check failure must NOT exit the caller script.
+# N.B.:
+#  - by default it is recommended to get an exit asap of the caller, to avoid
+#     working on bad configuration (like bad path for instance)
+#  - but it can be very interesting to perform a whole check of configuration to
+#     report all error at once (it is the case with -X option of daemon scripts)
+BSC_MODE_CHECK_CONFIG=${BSC_MODE_CHECK_CONFIG:-0}
+# Defines default BSC_CATEGORY if not already defined.
+BSC_CATEGORY=${BSC_CATEGORY:-general}
 # By default, system logs messages on console.
-LOG_CONSOLE_OFF=${LOG_CONSOLE_OFF:-0}
-# Initializes temporary log file with temporary value.
-LOG_FILE=${LOG_FILE:-$DEFAULT_LOG_FILE}
+BSC_LOG_CONSOLE_OFF=${BSC_LOG_CONSOLE_OFF:-0}
 # By default, each component has a specific log file
-#  (LOG_FILE_APPEND_MODE allows to define if caller script can continue to log in same file).
-LOG_FILE_APPEND_MODE=${LOG_FILE_APPEND_MODE:-0}
+#  (BSC_LOG_FILE_APPEND_MODE allows to define if caller script can continue to log in same file).
+BSC_LOG_FILE_APPEND_MODE=${BSC_LOG_FILE_APPEND_MODE:-0}
 
 # By default, any error message will totally ends the script.
 # This variable allows changing this behaviour (NOT recommended !!!)
-ERROR_MESSAGE_EXITS_SCRIPT=${ERROR_MESSAGE_EXITS_SCRIPT:-1}
-
-# Initializes environment variables if not already the case.
-ANT_HOME=${ANT_HOME:-}
-JAVA_HOME=${JAVA_HOME:-}
-LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}
+BSC_ERROR_MESSAGE_EXITS_SCRIPT=${BSC_ERROR_MESSAGE_EXITS_SCRIPT:-1}
