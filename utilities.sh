@@ -19,7 +19,6 @@
 #  BSC_CATEGORY             <string>  the category which prepends all messages
 #  BSC_LOG_CONSOLE_OFF          0|1   disable message output on console
 #  BSC_LOG_FILE               <path>  path of the log file
-#  BSC_LOG_FILE_APPEND_MODE     0|1   activate append mode, instead of the default override one
 #  BSC_MODE_CHECK_CONFIG        0|1   check ALL configuration and then quit (useful to check all the configuration you want, +/- like a dry run)
 #  BSC_DAEMON_STOP_TIMEOUT <integer>  timeout (in seconds) before killing a daemon process after stop request
 
@@ -56,6 +55,7 @@ declare -r _BSC_LOG_LEVEL_INFO=1
 declare -r _BSC_LOG_LEVEL_MESSAGE=2
 declare -r _BSC_LOG_LEVEL_WARNING=3
 declare -r _BSC_LOG_LEVEL_ERROR=4
+declare -r _BSC_LOG_NO_MESSAGE="/!\ NO MESSAGE SPECIFIED /!\ (May be you attempt to print an empty variable ?)"
 
 # Configuration element types.
 declare -r BSC_CONFIG_NOT_FOUND="CONFIG NOT FOUND"
@@ -91,15 +91,16 @@ declare -r BSC_ERROR_CHECK_CONFIG=108
 # PID Files.
 declare -r BSC_ERROR_PID_FILE=120
 
-# Timeout (in seconds) when stopping process, before killing it.
-declare -r BSC_DAEMON_OPTION_RUN="-R"
-
+# Daemon feature actions.
 declare -r BSC_DAEMON_ACTION_START="start"
 declare -r BSC_DAEMON_ACTION_STATUS="status"
 declare -r BSC_DAEMON_ACTION_STOP="stop"
 declare -r BSC_DAEMON_ACTION_DAEMON="daemon"
 declare -r BSC_DAEMON_ACTION_RUN="run"
 
+# Daemon feature CLI options.
+declare -r BSC_DAEMON_OPTION_RUN="-R"
+declare -r BSC_DAEMON_OPTION_DAEMON="-D"
 
 #########################
 ## Functions - Debug
@@ -249,33 +250,33 @@ function writeNotFound() {
 # usage: writeMessage <message>
 # Shows the message, and moves to next line.
 function writeMessage() {
-  _doWriteMessage $_BSC_LOG_LEVEL_MESSAGE "$1" "${2:-1}" -1
+  _doWriteMessage $_BSC_LOG_LEVEL_MESSAGE "${1:-$_BSC_LOG_NO_MESSAGE}" "${2:-1}" -1
 }
 
 # usage: writeMessageSL <message>
 # Shows the message, and stays to same line.
 function writeMessageSL() {
-  _doWriteMessage $_BSC_LOG_LEVEL_MESSAGE "$1" 0 -1
+  _doWriteMessage $_BSC_LOG_LEVEL_MESSAGE "${1:-$_BSC_LOG_NO_MESSAGE}" 0 -1
 }
 
 # usage: info <message> [<0 or 1>]
 # Shows message only if $BSC_VERBOSE is ON.
 # Stays on the same line if "0" has been specified
 function info() {
-  _doWriteMessage $_BSC_LOG_LEVEL_INFO "$1" "${2:-1}"
+  _doWriteMessage $_BSC_LOG_LEVEL_INFO "${1:-$_BSC_LOG_NO_MESSAGE}" "${2:-1}"
 }
 
 # usage: warning <message> [<0 or 1>]
 # Shows warning message.
 # Stays on the same line if "0" has been specified
 function warning() {
-  _doWriteMessage $_BSC_LOG_LEVEL_WARNING "$1" "${2:-1}" >&2
+  _doWriteMessage $_BSC_LOG_LEVEL_WARNING "${1:-$_BSC_LOG_NO_MESSAGE}" "${2:-1}" >&2
 }
 
 # usage: errorMessage <message> [<exit code>]
 # Shows error message and exits.
 function errorMessage() {
-  _doWriteMessage $_BSC_LOG_LEVEL_ERROR "$1" 1 "${2:-$BSC_ERROR_DEFAULT}" >&2
+  _doWriteMessage $_BSC_LOG_LEVEL_ERROR "${1:-$_BSC_LOG_NO_MESSAGE}" 1 "${2:-$BSC_ERROR_DEFAULT}" >&2
 }
 
 
@@ -317,14 +318,16 @@ function isAbsolutePath() {
 
 # usage: checkPath <path>
 function checkPath() {
+  local _path="$1"
+
   # Informs only if not in 'BSC_MODE_CHECK_CONFIG' mode.
-  ! isCheckModeConfigOnly && info "Checking path '$1' ... "
+  ! isCheckModeConfigOnly && info "Checking path '$_path' ... "
 
   # Checks if the path exists.
-  [ -e "$1" ] && return 0
+  [ -e "$_path" ] && return 0
 
   # It is not the case, if NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error.
-  ! isCheckModeConfigOnly && errorMessage "Unable to find '$1'." $BSC_ERROR_CHECK_CONFIG
+  ! isCheckModeConfigOnly && errorMessage "Unable to find '$_path'." $BSC_ERROR_CHECK_CONFIG
   # Otherwise, simple returns an error code.
   return $BSC_ERROR_CHECK_CONFIG
 }
@@ -334,7 +337,7 @@ function checkBin() {
   local _binary="$1"
 
   # Informs only if not in 'BSC_MODE_CHECK_CONFIG' mode.
-  ! isCheckModeConfigOnly && info "Checking binary '$1' ... "
+  ! isCheckModeConfigOnly && info "Checking binary '$_binary' ... "
 
   # Checks if the binary is available.
   command -v "$_binary" >/dev/null 2>&1 && return 0
@@ -347,24 +350,26 @@ function checkBin() {
 
 # usage: checkDataFile <data file path>
 function checkDataFile() {
+  local _dataFile="$1"
+
   # Informs only if not in 'BSC_MODE_CHECK_CONFIG' mode.
-  ! isCheckModeConfigOnly && info "Checking data file '$1' ... "
+  ! isCheckModeConfigOnly && info "Checking data file '$_dataFile' ... "
 
   # Checks if the file exists.
-  [ -f "$1" ] && return 0
+  [ -f "$_dataFile" ] && return 0
 
   # It is not the case, if NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error.
-  ! isCheckModeConfigOnly && errorMessage "Unable to find data file '$1'." $BSC_ERROR_CHECK_CONFIG
+  ! isCheckModeConfigOnly && errorMessage "Unable to find data file '$_dataFile'." $BSC_ERROR_CHECK_CONFIG
   # Otherwise, simple returns an error code.
   return $BSC_ERROR_CHECK_CONFIG
 }
 
-# usage: buildCompletePath <path> [<path to prepend> <force prepend>]
+# usage: buildCompletePath <path> [<force prepend>] [<path to prepend>]
+# <force prepend>: 0=disabled, 1 (default)=force prepend for "single path" (useful for data file)
 # <path to prepend>: the path to prepend if the path is NOT absolute and NOT simple.
 # Defaut <path to prepend> is $BSC_ROOT_DIR
-# <force prepend>: 0=disabled (default), 1=force prepend for "single path" (useful for data file)
 function buildCompletePath() {
-  local _path _pathToPreprend="${2:-$BSC_ROOT_DIR}" _forcePrepend="${3:-0}"
+  local _path _forcePrepend="${2:-1}" _pathToPreprend="${3:-$BSC_ROOT_DIR}"
   _path="$( pruneSlash "$1" )"
 
   # Replaces potential '~' character.
@@ -376,7 +381,7 @@ function buildCompletePath() {
   # Checks if it is a "simple" path.
   isRelativePath "$_path" && [ "$_forcePrepend" -eq 0 ] && echo "$_path" && return 0
 
-  # Prefixes with install directory path.
+  # Prefixes with path to prepend.
   echo "$_pathToPreprend/$_path"
 }
 
@@ -388,7 +393,7 @@ function checkAndFormatPath() {
   formattedPath=""
   while IFS= read -r -d ':' pathToCheck; do
     # Defines the completes path, according to absolute/relative path.
-    completePath=$( buildCompletePath "$pathToCheck" "$_pathToPreprend" 1 )
+    completePath=$( buildCompletePath "$pathToCheck" 1 "$_pathToPreprend" )
 
     # Uses "ls" to complete the path in case there is wildcard.
     if [[ "$completePath" =~ ^.*[*].*$ ]]; then
@@ -432,7 +437,7 @@ function doListConfigKeyValues() {
 #
 # usage: loadConfigKeyValueList [<search pattern>] [<key remove pattern>]
 # <search pattern>: optional regular expression of keys to consider (by default ALL configuration will be considered)
-# <key remove pattern>: optional refular expression of key's part to remove in the final associative array (can be useful to use pattern matching with remaining part of key).
+# <key remove pattern>: optional regular expression of key's part to remove in the final associative array (can be useful to use pattern matching with remaining part of key).
 function loadConfigKeyValueList() {
   local _searchPattern="${1:-.*}" _keyRemovePattern="${2:-}"
 
@@ -469,11 +474,11 @@ function listConfigKeys() {
   echo "${!BSC_LAST_READ_CONFIG_KEY_VALUE_LIST[@]}"
 }
 
-# usage: checkConfigValue <configuration file> <config key>
-function checkConfigValue() {
+# usage: _checkConfigValue <configuration file> <config key>
+function _checkConfigValue() {
   local _configFile="$1" _configKey="$2"
   # Ensures configuration file exists ('user' one does not exist for root user;
-  #  and 'global' configuration file does not exists for only-standard user installation.
+  #  and 'global' configuration file does not exists for only-standard user installation).
   if [ ! -f "$_configFile" ]; then
     # IMPORTANT: be careful not to print something in the standard output or it would break the checkAndSetConfig feature.
     [ "$BSC_DEBUG_UTILITIES" -eq 1 ] && printf "Configuration file '%b' not found ... " "$_configFile" >&2
@@ -489,10 +494,10 @@ function getConfigValue() {
 
   # Checks in use configuration file.
   configFileToRead="$BSC_CONFIG_FILE"
-  if ! checkConfigValue "$configFileToRead" "$_configKey"; then
+  if ! _checkConfigValue "$configFileToRead" "$_configKey"; then
     # Checks in global configuration file.
     configFileToRead="$BSC_GLOBAL_CONFIG_FILE"
-    if ! checkConfigValue "$configFileToRead" "$_configKey"; then
+    if ! _checkConfigValue "$configFileToRead" "$_configKey"; then
       # Prints error message (and exit) only if NOT in "check config and quit" mode.
       ! isCheckModeConfigOnly && errorMessage "Configuration key '$_configKey' NOT found in any of configuration files" $BSC_ERROR_CONFIG_VARIOUS
       [ "$BSC_DEBUG_UTILITIES" -eq 1 ] && printf "configuration key '%b' \E[31mNOT FOUND\E[0m in any of configuration files" "$_configKey"
@@ -551,7 +556,7 @@ function checkAndSetConfig() {
   checkPathStatus=0
   if [ "$_configType" -ne $BSC_CONFIG_TYPE_OPTION ]; then
     [ "$_configType" -ne $BSC_CONFIG_TYPE_BIN ] && forcePrepend=1 || forcePrepend=0
-    _value=$( buildCompletePath "$_value" "$_pathToPreprend" $forcePrepend )
+    _value=$( buildCompletePath "$_value" $forcePrepend "$_pathToPreprend" )
 
     if [ "$_configType" -eq $BSC_CONFIG_TYPE_PATH ] && [ "$_pathMustExist" -eq 1 ]; then
       checkPath "$_value"
@@ -587,15 +592,16 @@ function checkAndSetConfig() {
 ## Functions - Version Feature
 
 # usage: getVersion <file path> [<default version>]
-# This method returns the more recent version of the given ChangeLog/NEWS file path.
+# This method returns the more recent version of the given ChangeLog/NEWS/README file path.
+# It returns the specified default value if file is not found.
 function getVersion() {
-    local _newsFile="${1:-ChangeLog}" _defaultVersion="${2:-0.1.0}"
+    local _fileWithVersion="${1:-ChangeLog}" _defaultVersion="${2:-0.1.0}"
 
     # Lookup the version in the NEWS file (which did not exist in version 0.1)
-    [ ! -f "$_newsFile" ] && echo "$_defaultVersion" && return 0
+    [ ! -f "$_fileWithVersion" ] && echo "$_defaultVersion" && return 0
 
     # Extracts the version.
-    grep "version [0-9]" "$_newsFile" |head -n 1 |sed -e 's/^.*version[ \t]\([0-9][0-9.]*\)[ \t].*$/\1/;s/^.*version[ \t]\([0-9][0-9.]*\)$/\1/;'
+    grep "version [0-9]" "$_fileWithVersion" |head -n 1 |sed -e 's/^.*version[ \t*]\([0-9][0-9.]*\)[ \t*].*$/\1/;s/^.*version[ \t]\([0-9][0-9.]*\)$/\1/;'
 }
 
 # usage: getDetailedVersion <Major Version> <installation directory>
@@ -702,19 +708,6 @@ function getUptime() {
 #########################
 ## Functions - Contents management (files, value, pattern matching ...)
 
-# usage: matchesOneOf <element to check> <patterns>
-function matchesOneOf() {
-  local _element="$1"
-  shift
-  local _patterns=("$@")
-
-  for pattern in "${_patterns[@]}"; do
-    [[ "$_element" =~ $pattern ]] && return 0
-  done
-
-  return 1
-}
-
 # usage: getLastLinesFromN <file path> <line begin>
 function getLastLinesFromN() {
   local _source="$1" _lineBegin="$2"
@@ -751,6 +744,19 @@ function isNumber() {
 # Returns true if it is a single number OR a compounded number.
 function isCompoundedNumber() {
   [[ "$1" =~ ^[[:digit:]]+-*[0-9]*$ ]]
+}
+
+# usage: matchesOneOf <element to check> <patterns>
+function matchesOneOf() {
+  local _element="$1"
+  shift
+  local _patterns=("$@")
+
+  for pattern in "${_patterns[@]}"; do
+    [[ "$_element" =~ $pattern ]] && return 0
+  done
+
+  return 1
 }
 
 # Usage: removeAllSpecifiedPartsFromString <string> <parts> [<case-insensitive>]
@@ -805,13 +811,15 @@ function writePIDFile() {
 
   echo "processName=$_processName" > "$_pidFile"
   echo "pid=$$" >> "$_pidFile"
-  info "Written PID '$$' of process '$_processName' in file '$1'."
+  info "Written PID '$$' of process '$_processName' in file '$_pidFile'."
 }
 
 # usage: deletePIDFile <pid file>
 function deletePIDFile() {
-  info "Removing PID file '$1'"
-  rm -f "$1"
+  local _pidFile="$1"
+
+  info "Removing PID file '$_pidFile'"
+  rm -f "$_pidFile"
 }
 
 # usage: doExtractInfoFromPIDFile <pid file> <pid|processName>
@@ -865,7 +873,7 @@ function isRunningProcess() {
 
   # It is not the case, informs and deletes the PID file.
   deletePIDFile "$_pidFile"
-  info "process is dead but pid file exists. Deleted it."
+  info "process is dead but pid file still exists. Deleted it."
   return 1
 }
 
@@ -888,11 +896,11 @@ function checkAllProcessFromPIDFiles() {
 
 
 #########################
-## Functions - Daemon star/stop/isRunning Feature
+## Functions - Daemon Feature
 
-# usage: startProcess <pid file> <process name> <options>
+# usage: _startProcess <pid file> <process name> <options>
 # options MUST be an array containing any count of elements
-function startProcess() {
+function _startProcess() {
   local _pidFile="$1"
   shift
   local _processName="$1"
@@ -910,8 +918,8 @@ function startProcess() {
   exec "$_processName" "${_options[@]}"
 }
 
-# usage: stopProcess <pid file> <process name>
-function stopProcess() {
+# usage: _stopProcess <pid file> <process name>
+function _stopProcess() {
   local _pidFile="$1"
   local _processName="$2"
 
@@ -957,8 +965,8 @@ function killChildProcesses() {
   [ "$_topProcess" -eq 0 ] && kill -s HUP "$_pid"
 }
 
-# usage: setUpKillChildTrap <process name>
-function setUpKillChildTrap() {
+# usage: _setUpKillChildTrap <process name>
+function _setUpKillChildTrap() {
   export TRAP_processName="$1"
 
   ## IMPORTANT: when the main process is stopped (or killed), all its child must be stopped too,
@@ -968,10 +976,24 @@ function setUpKillChildTrap() {
   trap 'writeMessage "Killing all processes of the group of main process $TRAP_processName"; killChildProcesses $$ 1; exit 0' EXIT
 }
 
-# usage: manageDaemon <action> <name> <pid file> <process> [<logFile> <outputFile> [<options>]]
-#   action can be: start, status, stop (and daemon, only for internal purposes)
-#   logFile, outputFile are only needed if action is "start"
-#   options (which MUST be an array containing any count of elements) is only needed if action is "daemon"
+# usage: manageDaemon <action> <name> <pid file> <process name> [<logFile> <outputFile> [<options>]]
+#   <action> can be one of:
+#    - $BSC_DAEMON_ACTION_START   starts the daemon
+#    - $BSC_DAEMON_ACTION_STATUS  checks the status of the daemon
+#    - $BSC_DAEMON_ACTION_STOP    stops the daemon
+#    - $BSC_DAEMON_ACTION_RUN     (internal) (optional) runs instructions of the Daemon itself
+#    - $BSC_DAEMON_ACTION_DAEMON  (internal) daemonizes really the daemon
+#   <name> name of your Daemon script
+#   <pid file> the PID file to use to manage the process which will be "daemonized"
+#   <process name> the name/path of the process to launch (can be a third party tool, or the Daemon script itself)
+#   <logFile> and <outputFile> are only needed if action is "start"
+#   <options> (which MUST be an array containing any count of elements), only needed if action is "daemon"
+#
+# Action state machine:
+#   Start => (internal) Daemon => (optional*)(internal) Run => Stop
+#   At any time, the Status can be requested to get the status of the daemon
+#   * the Run action is only used if Daemon script is running itself
+#      some instructions instead of launching third party tools
 function manageDaemon() {
   local _action="$1" _name="$2" _pidFile="$3" _processName="$4"
   local _logFile="$5" _outputFile="$6"
@@ -985,11 +1007,11 @@ function manageDaemon() {
       # If the option is NOT the special one which activates last action "run"; setups trap ensuring
       # children process will be stopped in same time this main process is stopped, otherwise it will
       # setup when managing the run action.
-      [[ "${_options[*]}" != "$BSC_DAEMON_OPTION_RUN" ]] && setUpKillChildTrap "$_processName"
+      [[ "${_options[*]}" != "$BSC_DAEMON_OPTION_RUN" ]] && _setUpKillChildTrap "$_processName"
 
       # Starts the process.
       # N.B.: here we WANT word splitting on $_options, so we don't put quotes.
-      startProcess "$_pidFile" "$_processName" "${_options[@]}"
+      _startProcess "$_pidFile" "$_processName" "${_options[@]}"
     ;;
 
     $BSC_DAEMON_ACTION_START)
@@ -997,7 +1019,7 @@ function manageDaemon() {
       isRunningProcess "$_pidFile" "$_processName" && writeMessage "$_name is already running." && return 0
 
       # Starts it, launching this script in daemon mode.
-      BSC_LOG_FILE="$_logFile" BSC_LOG_CONSOLE_OFF=${BSC_LOG_CONSOLE_OFF:-1} "$0" -D >>"$_outputFile" &
+      BSC_LOG_FILE="$_logFile" BSC_LOG_CONSOLE_OFF=${BSC_LOG_CONSOLE_OFF:-1} "$0" "$BSC_DAEMON_OPTION_DAEMON" >>"$_outputFile" &
       writeMessage "Launched $_name."
     ;;
 
@@ -1014,7 +1036,7 @@ function manageDaemon() {
       ! isRunningProcess "$_pidFile" "$_processName" && writeMessage "$_name is NOT running." && return 0
 
       # Stops the process.
-      stopProcess "$_pidFile" "$_processName" || errorMessage "Unable to stop $_name."
+      _stopProcess "$_pidFile" "$_processName" || errorMessage "Unable to stop $_name."
       writeMessage "Stopped $_name."
     ;;
 
@@ -1023,7 +1045,7 @@ function manageDaemon() {
       [ -z "$BSC_LOG_CONSOLE_OFF" ] && export BSC_LOG_CONSOLE_OFF=1
 
       # Setups trap ensuring children process will be stopped in same time this main process is stopped.
-      setUpKillChildTrap "$_processName"
+      _setUpKillChildTrap "$_processName"
     ;;
 
     [?])  return 1;;
@@ -1146,8 +1168,8 @@ declare -r _BSC_DEFAULT_TMP_DIR="${BSC_TMP_DIR:-/tmp/$( getFormattedDatetime '%Y
 declare -r _BSC_DEFAULT_PID_DIR="$_BSC_DEFAULT_TMP_DIR/_pids"
 
 declare -r _BSC_DEFAULT_LOG_FILE="${_BSC_DEFAULT_LOG_FILE:-$_BSC_DEFAULT_TMP_DIR/logFile.log}"
-declare -r _BSC_DEFAULT_CONFIG_FILE="$_BSC_DEFAULT_ROOT_DIR/.config/$launchedScriptName.conf"
-declare -r _BSC_DEFAULT_GLOBAL_CONFIG_FILE="/etc/$launchedScriptName.conf"
+declare -r _BSC_DEFAULT_CONFIG_FILE="${HOME:-/home/$( whoami )}/.config/${launchedScriptName%[.]*}.conf"
+declare -r _BSC_DEFAULT_GLOBAL_CONFIG_FILE="/etc/${launchedScriptName%[.]*}.conf"
 declare -r _BSC_DEFAULT_TIME_FILE="$_BSC_DEFAULT_TMP_DIR/timeFile"
 
 declare -r _BSC_DEFAULT_DAEMON_STOP_TIMEOUT=16
@@ -1187,9 +1209,6 @@ BSC_MODE_CHECK_CONFIG=${BSC_MODE_CHECK_CONFIG:-0}
 BSC_CATEGORY=${BSC_CATEGORY:-general}
 # By default, system logs messages on console.
 BSC_LOG_CONSOLE_OFF=${BSC_LOG_CONSOLE_OFF:-0}
-# By default, each component has a specific log file
-#  (BSC_LOG_FILE_APPEND_MODE allows to define if caller script can continue to log in same file).
-BSC_LOG_FILE_APPEND_MODE=${BSC_LOG_FILE_APPEND_MODE:-0}
 
 # By default, any error message will totally ends the script.
 # This variable allows changing this behaviour (NOT recommended !!!)
