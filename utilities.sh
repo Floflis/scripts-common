@@ -318,14 +318,16 @@ function isAbsolutePath() {
 
 # usage: checkPath <path>
 function checkPath() {
+  local _path="$1"
+
   # Informs only if not in 'BSC_MODE_CHECK_CONFIG' mode.
-  ! isCheckModeConfigOnly && info "Checking path '$1' ... "
+  ! isCheckModeConfigOnly && info "Checking path '$_path' ... "
 
   # Checks if the path exists.
-  [ -e "$1" ] && return 0
+  [ -e "$_path" ] && return 0
 
   # It is not the case, if NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error.
-  ! isCheckModeConfigOnly && errorMessage "Unable to find '$1'." $BSC_ERROR_CHECK_CONFIG
+  ! isCheckModeConfigOnly && errorMessage "Unable to find '$_path'." $BSC_ERROR_CHECK_CONFIG
   # Otherwise, simple returns an error code.
   return $BSC_ERROR_CHECK_CONFIG
 }
@@ -335,7 +337,7 @@ function checkBin() {
   local _binary="$1"
 
   # Informs only if not in 'BSC_MODE_CHECK_CONFIG' mode.
-  ! isCheckModeConfigOnly && info "Checking binary '$1' ... "
+  ! isCheckModeConfigOnly && info "Checking binary '$_binary' ... "
 
   # Checks if the binary is available.
   command -v "$_binary" >/dev/null 2>&1 && return 0
@@ -348,24 +350,26 @@ function checkBin() {
 
 # usage: checkDataFile <data file path>
 function checkDataFile() {
+  local _dataFile="$1"
+
   # Informs only if not in 'BSC_MODE_CHECK_CONFIG' mode.
-  ! isCheckModeConfigOnly && info "Checking data file '$1' ... "
+  ! isCheckModeConfigOnly && info "Checking data file '$_dataFile' ... "
 
   # Checks if the file exists.
-  [ -f "$1" ] && return 0
+  [ -f "$_dataFile" ] && return 0
 
   # It is not the case, if NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error.
-  ! isCheckModeConfigOnly && errorMessage "Unable to find data file '$1'." $BSC_ERROR_CHECK_CONFIG
+  ! isCheckModeConfigOnly && errorMessage "Unable to find data file '$_dataFile'." $BSC_ERROR_CHECK_CONFIG
   # Otherwise, simple returns an error code.
   return $BSC_ERROR_CHECK_CONFIG
 }
 
-# usage: buildCompletePath <path> [<path to prepend> <force prepend>]
+# usage: buildCompletePath <path> [<force prepend>] [<path to prepend>]
+# <force prepend>: 0=disabled, 1 (default)=force prepend for "single path" (useful for data file)
 # <path to prepend>: the path to prepend if the path is NOT absolute and NOT simple.
 # Defaut <path to prepend> is $BSC_ROOT_DIR
-# <force prepend>: 0=disabled (default), 1=force prepend for "single path" (useful for data file)
 function buildCompletePath() {
-  local _path _pathToPreprend="${2:-$BSC_ROOT_DIR}" _forcePrepend="${3:-0}"
+  local _path _forcePrepend="${2:-1}" _pathToPreprend="${3:-$BSC_ROOT_DIR}"
   _path="$( pruneSlash "$1" )"
 
   # Replaces potential '~' character.
@@ -389,7 +393,7 @@ function checkAndFormatPath() {
   formattedPath=""
   while IFS= read -r -d ':' pathToCheck; do
     # Defines the completes path, according to absolute/relative path.
-    completePath=$( buildCompletePath "$pathToCheck" "$_pathToPreprend" 1 )
+    completePath=$( buildCompletePath "$pathToCheck" 1 "$_pathToPreprend" )
 
     # Uses "ls" to complete the path in case there is wildcard.
     if [[ "$completePath" =~ ^.*[*].*$ ]]; then
@@ -470,11 +474,11 @@ function listConfigKeys() {
   echo "${!BSC_LAST_READ_CONFIG_KEY_VALUE_LIST[@]}"
 }
 
-# usage: checkConfigValue <configuration file> <config key>
-function checkConfigValue() {
+# usage: _checkConfigValue <configuration file> <config key>
+function _checkConfigValue() {
   local _configFile="$1" _configKey="$2"
   # Ensures configuration file exists ('user' one does not exist for root user;
-  #  and 'global' configuration file does not exists for only-standard user installation.
+  #  and 'global' configuration file does not exists for only-standard user installation).
   if [ ! -f "$_configFile" ]; then
     # IMPORTANT: be careful not to print something in the standard output or it would break the checkAndSetConfig feature.
     [ "$BSC_DEBUG_UTILITIES" -eq 1 ] && printf "Configuration file '%b' not found ... " "$_configFile" >&2
@@ -490,10 +494,10 @@ function getConfigValue() {
 
   # Checks in use configuration file.
   configFileToRead="$BSC_CONFIG_FILE"
-  if ! checkConfigValue "$configFileToRead" "$_configKey"; then
+  if ! _checkConfigValue "$configFileToRead" "$_configKey"; then
     # Checks in global configuration file.
     configFileToRead="$BSC_GLOBAL_CONFIG_FILE"
-    if ! checkConfigValue "$configFileToRead" "$_configKey"; then
+    if ! _checkConfigValue "$configFileToRead" "$_configKey"; then
       # Prints error message (and exit) only if NOT in "check config and quit" mode.
       ! isCheckModeConfigOnly && errorMessage "Configuration key '$_configKey' NOT found in any of configuration files" $BSC_ERROR_CONFIG_VARIOUS
       [ "$BSC_DEBUG_UTILITIES" -eq 1 ] && printf "configuration key '%b' \E[31mNOT FOUND\E[0m in any of configuration files" "$_configKey"
@@ -552,7 +556,7 @@ function checkAndSetConfig() {
   checkPathStatus=0
   if [ "$_configType" -ne $BSC_CONFIG_TYPE_OPTION ]; then
     [ "$_configType" -ne $BSC_CONFIG_TYPE_BIN ] && forcePrepend=1 || forcePrepend=0
-    _value=$( buildCompletePath "$_value" "$_pathToPreprend" $forcePrepend )
+    _value=$( buildCompletePath "$_value" $forcePrepend "$_pathToPreprend" )
 
     if [ "$_configType" -eq $BSC_CONFIG_TYPE_PATH ] && [ "$_pathMustExist" -eq 1 ]; then
       checkPath "$_value"
@@ -704,19 +708,6 @@ function getUptime() {
 #########################
 ## Functions - Contents management (files, value, pattern matching ...)
 
-# usage: matchesOneOf <element to check> <patterns>
-function matchesOneOf() {
-  local _element="$1"
-  shift
-  local _patterns=("$@")
-
-  for pattern in "${_patterns[@]}"; do
-    [[ "$_element" =~ $pattern ]] && return 0
-  done
-
-  return 1
-}
-
 # usage: getLastLinesFromN <file path> <line begin>
 function getLastLinesFromN() {
   local _source="$1" _lineBegin="$2"
@@ -753,6 +744,19 @@ function isNumber() {
 # Returns true if it is a single number OR a compounded number.
 function isCompoundedNumber() {
   [[ "$1" =~ ^[[:digit:]]+-*[0-9]*$ ]]
+}
+
+# usage: matchesOneOf <element to check> <patterns>
+function matchesOneOf() {
+  local _element="$1"
+  shift
+  local _patterns=("$@")
+
+  for pattern in "${_patterns[@]}"; do
+    [[ "$_element" =~ $pattern ]] && return 0
+  done
+
+  return 1
 }
 
 # Usage: removeAllSpecifiedPartsFromString <string> <parts> [<case-insensitive>]
@@ -807,13 +811,15 @@ function writePIDFile() {
 
   echo "processName=$_processName" > "$_pidFile"
   echo "pid=$$" >> "$_pidFile"
-  info "Written PID '$$' of process '$_processName' in file '$1'."
+  info "Written PID '$$' of process '$_processName' in file '$_pidFile'."
 }
 
 # usage: deletePIDFile <pid file>
 function deletePIDFile() {
-  info "Removing PID file '$1'"
-  rm -f "$1"
+  local _pidFile="$1"
+
+  info "Removing PID file '$_pidFile'"
+  rm -f "$_pidFile"
 }
 
 # usage: doExtractInfoFromPIDFile <pid file> <pid|processName>
@@ -890,11 +896,11 @@ function checkAllProcessFromPIDFiles() {
 
 
 #########################
-## Functions - Daemon star/stop/isRunning Feature
+## Functions - Daemon Feature
 
-# usage: startProcess <pid file> <process name> <options>
+# usage: _startProcess <pid file> <process name> <options>
 # options MUST be an array containing any count of elements
-function startProcess() {
+function _startProcess() {
   local _pidFile="$1"
   shift
   local _processName="$1"
@@ -912,8 +918,8 @@ function startProcess() {
   exec "$_processName" "${_options[@]}"
 }
 
-# usage: stopProcess <pid file> <process name>
-function stopProcess() {
+# usage: _stopProcess <pid file> <process name>
+function _stopProcess() {
   local _pidFile="$1"
   local _processName="$2"
 
@@ -959,8 +965,8 @@ function killChildProcesses() {
   [ "$_topProcess" -eq 0 ] && kill -s HUP "$_pid"
 }
 
-# usage: setUpKillChildTrap <process name>
-function setUpKillChildTrap() {
+# usage: _setUpKillChildTrap <process name>
+function _setUpKillChildTrap() {
   export TRAP_processName="$1"
 
   ## IMPORTANT: when the main process is stopped (or killed), all its child must be stopped too,
@@ -1001,11 +1007,11 @@ function manageDaemon() {
       # If the option is NOT the special one which activates last action "run"; setups trap ensuring
       # children process will be stopped in same time this main process is stopped, otherwise it will
       # setup when managing the run action.
-      [[ "${_options[*]}" != "$BSC_DAEMON_OPTION_RUN" ]] && setUpKillChildTrap "$_processName"
+      [[ "${_options[*]}" != "$BSC_DAEMON_OPTION_RUN" ]] && _setUpKillChildTrap "$_processName"
 
       # Starts the process.
       # N.B.: here we WANT word splitting on $_options, so we don't put quotes.
-      startProcess "$_pidFile" "$_processName" "${_options[@]}"
+      _startProcess "$_pidFile" "$_processName" "${_options[@]}"
     ;;
 
     $BSC_DAEMON_ACTION_START)
@@ -1030,7 +1036,7 @@ function manageDaemon() {
       ! isRunningProcess "$_pidFile" "$_processName" && writeMessage "$_name is NOT running." && return 0
 
       # Stops the process.
-      stopProcess "$_pidFile" "$_processName" || errorMessage "Unable to stop $_name."
+      _stopProcess "$_pidFile" "$_processName" || errorMessage "Unable to stop $_name."
       writeMessage "Stopped $_name."
     ;;
 
@@ -1039,7 +1045,7 @@ function manageDaemon() {
       [ -z "$BSC_LOG_CONSOLE_OFF" ] && export BSC_LOG_CONSOLE_OFF=1
 
       # Setups trap ensuring children process will be stopped in same time this main process is stopped.
-      setUpKillChildTrap "$_processName"
+      _setUpKillChildTrap "$_processName"
     ;;
 
     [?])  return 1;;
