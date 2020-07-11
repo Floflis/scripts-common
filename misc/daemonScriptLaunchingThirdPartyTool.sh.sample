@@ -1,0 +1,73 @@
+#!/bin/bash
+##
+## Author: Bertrand Benoit <mailto:contact@bertrand-benoit.net>
+## Description: Tests' Daemon sample 1.
+## Version: 1.0
+#
+# Must NOT be called directly - it will be managed by Tests system only.
+
+#########################
+## CONFIGURATION
+# general
+export BSC_CATEGORY="daemonSample"
+
+# Ensures utilities path has been defined, and sources it.
+[ -z "${SCRIPTS_COMMON_PATH:-}" ] && echo "SCRIPTS_COMMON_PATH environment variable must be defined." >&2 && exit 1
+# shellcheck disable=1090
+. "$SCRIPTS_COMMON_PATH"
+
+## Configuration.
+declare -r pidFile="$BSC_PID_DIR/testDaemonFeature.pid"
+declare -r daemonName="daemonSample"
+
+# N.B.:
+#  - it is a perfect moment to use configuration file feature to read third party tool
+#     to launch, and its options. It is not done here for sake of simplicity.
+#  - note we voluntary use quote (instead of double quote) for $input
+#     to NOT be substituted here, but later at the end of this script
+#     allowing to create a generic options, which are then completed at runtime
+declare -r monitorBin="inotifywait"
+declare -r monitorOptions='-q --format '%f' -e close_write -m $input'
+
+#########################
+## Command line management
+
+# N.B.: the -D option must only be used internally.
+# Defines BSC_VERBOSE to 0 if not already defined.
+BSC_VERBOSE=${BSC_VERBOSE:-0}
+newLogFile=""
+outputFile=""
+while getopts "XSTKDvh" opt
+do
+ case "$opt" in
+        X)      export BSC_MODE_CHECK_CONFIG=1;;
+        S)      action="$BSC_DAEMON_ACTION_START"
+                newLogFile="$BSC_LOG_FILE.daemonSample"
+                outputFile="$newLogFile";;
+        T)      action="$BSC_DAEMON_ACTION_STATUS";;
+        K)      action="$BSC_DAEMON_ACTION_STOP";;
+        ${BSC_DAEMON_OPTION_DAEMON//-/})
+                action="$BSC_DAEMON_ACTION_DAEMON";;
+        v)      BSC_VERBOSE=1;;
+        h|[?])  daemonUsage "$daemonName" ;;
+ esac
+done
+
+## Command line arguments check.
+# Ensures action is defined.
+[ -z "${action:-}" ] && daemonUsage "$daemonName"
+
+#########################
+## INSTRUCTIONS
+
+if [ "$action" = "$BSC_DAEMON_ACTION_DAEMON" ]; then
+  # Eval instruction is important to subsitute all optional variables specified in options.
+  declare -r input="$BSC_TMP_DIR"
+  declare -r options=$( eval echo "$monitorOptions" )
+
+  # Internal system requests an options array to work properly.
+  IFS=' ' read -r -a optionsArray <<< "$options"
+fi
+
+# Manages daemon.
+manageDaemon "$action" "$daemonName" "$pidFile" "$monitorBin" "$newLogFile" "$outputFile" "${optionsArray[@]:-}"

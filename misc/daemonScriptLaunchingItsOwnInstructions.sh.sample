@@ -1,0 +1,77 @@
+#!/bin/bash
+##
+## Author: Bertrand Benoit <mailto:contact@bertrand-benoit.net>
+## Description: Tests' Daemon sample 2.
+## Version: 1.0
+#
+# Must NOT be called directly - it will be managed by Tests system only.
+
+#########################
+## CONFIGURATION
+# general
+export BSC_CATEGORY="daemonSample"
+
+# Ensures utilities path has been defined, and sources it.
+[ -z "${SCRIPTS_COMMON_PATH:-}" ] && echo "SCRIPTS_COMMON_PATH environment variable must be defined." >&2 && exit 1
+# shellcheck disable=1090
+. "$SCRIPTS_COMMON_PATH"
+
+## Configuration.
+declare -r pidFile="$BSC_PID_DIR/testDaemonFeature.pid"
+declare -r daemonName="daemonSample"
+# N.B.: this script is both the daemon (managing start/status/stop/daemon actions), and the process to run (run action).
+declare -r processPath="$0"
+
+#########################
+## Command line management
+
+# N.B.: the -D option must only be used internally.
+# Defines BSC_VERBOSE to 0 if not already defined.
+BSC_VERBOSE=${BSC_VERBOSE:-0}
+newLogFile=""
+outputFile=""
+while getopts "XSTKDRvh" opt
+do
+ case "$opt" in
+        X)      export BSC_MODE_CHECK_CONFIG=1;;
+        S)      action="$BSC_DAEMON_ACTION_START"
+                newLogFile="$BSC_LOG_FILE.daemonSample"
+                outputFile="$newLogFile";;
+        T)      action="$BSC_DAEMON_ACTION_STATUS";;
+        K)      action="$BSC_DAEMON_ACTION_STOP";;
+        ${BSC_DAEMON_OPTION_DAEMON//-/})
+                action="$BSC_DAEMON_ACTION_DAEMON";;
+        ${BSC_DAEMON_OPTION_RUN//-/})
+                action="$BSC_DAEMON_ACTION_RUN";;
+
+        v)      BSC_VERBOSE=1;;
+        h|[?])  daemonUsage "$daemonName" ;;
+ esac
+done
+
+## Command line arguments check.
+# Ensures action is defined.
+[ -z "${action:-}" ] && daemonUsage "$daemonName"
+
+#########################
+## INSTRUCTIONS
+
+if [ "$action" = "$BSC_DAEMON_ACTION_DAEMON" ]; then
+  # Launches this script as daemon, used the **$BSC_DAEMON_OPTION_RUN** option
+  #  to request the run of the core of this Daemon.
+  declare -a optionsArray=("$BSC_DAEMON_OPTION_RUN")
+fi
+
+# Manages daemon.
+manageDaemon "$action" "$daemonName" "$pidFile" "$processPath" "$newLogFile" "$outputFile" "${optionsArray[@]:-}"
+
+# Exists but if in "run" action.
+[[ "$action" != "$BSC_DAEMON_ACTION_RUN" ]] && exit 0
+
+# From here, this script acts as the process managed as Daemon.
+# /!\ You can edit from here (removing following instructions), adding your own instructions.
+while true; do
+  # N.B.: enless loop, waiting to be killed by daemon management.
+  writeMessage "Test Daemon Process ..."
+  sleep 5
+done

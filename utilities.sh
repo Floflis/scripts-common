@@ -907,6 +907,9 @@ function _startProcess() {
   shift
   local _options=("$@")
 
+  ## Safe-guard: ensure Binary can be executed.
+  BSC_MODE_CHECK_CONFIG=1 checkBin "$_processName" || errorMessage "Safe-guard: '$_processName' tool not found; aborting replacement of this shell with '$_processName' tool, and options: '${_options[*]}'"
+
   ## Writes the PID file.
   writePIDFile "$_pidFile" "$_processName" || return 1
 
