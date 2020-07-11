@@ -19,7 +19,6 @@
 #  BSC_CATEGORY             <string>  the category which prepends all messages
 #  BSC_LOG_CONSOLE_OFF          0|1   disable message output on console
 #  BSC_LOG_FILE               <path>  path of the log file
-#  BSC_LOG_FILE_APPEND_MODE     0|1   activate append mode, instead of the default override one
 #  BSC_MODE_CHECK_CONFIG        0|1   check ALL configuration and then quit (useful to check all the configuration you want, +/- like a dry run)
 #  BSC_DAEMON_STOP_TIMEOUT <integer>  timeout (in seconds) before killing a daemon process after stop request
 
@@ -56,6 +55,7 @@ declare -r _BSC_LOG_LEVEL_INFO=1
 declare -r _BSC_LOG_LEVEL_MESSAGE=2
 declare -r _BSC_LOG_LEVEL_WARNING=3
 declare -r _BSC_LOG_LEVEL_ERROR=4
+declare -r _BSC_LOG_NO_MESSAGE="/!\ NO MESSAGE SPECIFIED /!\ (May be you attempt to print an empty variable ?)"
 
 # Configuration element types.
 declare -r BSC_CONFIG_NOT_FOUND="CONFIG NOT FOUND"
@@ -91,15 +91,16 @@ declare -r BSC_ERROR_CHECK_CONFIG=108
 # PID Files.
 declare -r BSC_ERROR_PID_FILE=120
 
-# Timeout (in seconds) when stopping process, before killing it.
-declare -r BSC_DAEMON_OPTION_RUN="-R"
-
+# Daemon feature actions.
 declare -r BSC_DAEMON_ACTION_START="start"
 declare -r BSC_DAEMON_ACTION_STATUS="status"
 declare -r BSC_DAEMON_ACTION_STOP="stop"
 declare -r BSC_DAEMON_ACTION_DAEMON="daemon"
 declare -r BSC_DAEMON_ACTION_RUN="run"
 
+# Daemon feature CLI options.
+declare -r BSC_DAEMON_OPTION_RUN="-R"
+declare -r BSC_DAEMON_OPTION_DAEMON="-D"
 
 #########################
 ## Functions - Debug
@@ -249,33 +250,33 @@ function writeNotFound() {
 # usage: writeMessage <message>
 # Shows the message, and moves to next line.
 function writeMessage() {
-  _doWriteMessage $_BSC_LOG_LEVEL_MESSAGE "$1" "${2:-1}" -1
+  _doWriteMessage $_BSC_LOG_LEVEL_MESSAGE "${1:-$_BSC_LOG_NO_MESSAGE}" "${2:-1}" -1
 }
 
 # usage: writeMessageSL <message>
 # Shows the message, and stays to same line.
 function writeMessageSL() {
-  _doWriteMessage $_BSC_LOG_LEVEL_MESSAGE "$1" 0 -1
+  _doWriteMessage $_BSC_LOG_LEVEL_MESSAGE "${1:-$_BSC_LOG_NO_MESSAGE}" 0 -1
 }
 
 # usage: info <message> [<0 or 1>]
 # Shows message only if $BSC_VERBOSE is ON.
 # Stays on the same line if "0" has been specified
 function info() {
-  _doWriteMessage $_BSC_LOG_LEVEL_INFO "$1" "${2:-1}"
+  _doWriteMessage $_BSC_LOG_LEVEL_INFO "${1:-$_BSC_LOG_NO_MESSAGE}" "${2:-1}"
 }
 
 # usage: warning <message> [<0 or 1>]
 # Shows warning message.
 # Stays on the same line if "0" has been specified
 function warning() {
-  _doWriteMessage $_BSC_LOG_LEVEL_WARNING "$1" "${2:-1}" >&2
+  _doWriteMessage $_BSC_LOG_LEVEL_WARNING "${1:-$_BSC_LOG_NO_MESSAGE}" "${2:-1}" >&2
 }
 
 # usage: errorMessage <message> [<exit code>]
 # Shows error message and exits.
 function errorMessage() {
-  _doWriteMessage $_BSC_LOG_LEVEL_ERROR "$1" 1 "${2:-$BSC_ERROR_DEFAULT}" >&2
+  _doWriteMessage $_BSC_LOG_LEVEL_ERROR "${1:-$_BSC_LOG_NO_MESSAGE}" 1 "${2:-$BSC_ERROR_DEFAULT}" >&2
 }
 
 
@@ -376,7 +377,7 @@ function buildCompletePath() {
   # Checks if it is a "simple" path.
   isRelativePath "$_path" && [ "$_forcePrepend" -eq 0 ] && echo "$_path" && return 0
 
-  # Prefixes with install directory path.
+  # Prefixes with path to prepend.
   echo "$_pathToPreprend/$_path"
 }
 
@@ -432,7 +433,7 @@ function doListConfigKeyValues() {
 #
 # usage: loadConfigKeyValueList [<search pattern>] [<key remove pattern>]
 # <search pattern>: optional regular expression of keys to consider (by default ALL configuration will be considered)
-# <key remove pattern>: optional refular expression of key's part to remove in the final associative array (can be useful to use pattern matching with remaining part of key).
+# <key remove pattern>: optional regular expression of key's part to remove in the final associative array (can be useful to use pattern matching with remaining part of key).
 function loadConfigKeyValueList() {
   local _searchPattern="${1:-.*}" _keyRemovePattern="${2:-}"
 
@@ -587,15 +588,16 @@ function checkAndSetConfig() {
 ## Functions - Version Feature
 
 # usage: getVersion <file path> [<default version>]
-# This method returns the more recent version of the given ChangeLog/NEWS file path.
+# This method returns the more recent version of the given ChangeLog/NEWS/README file path.
+# It returns the specified default value if file is not found.
 function getVersion() {
-    local _newsFile="${1:-ChangeLog}" _defaultVersion="${2:-0.1.0}"
+    local _fileWithVersion="${1:-ChangeLog}" _defaultVersion="${2:-0.1.0}"
 
     # Lookup the version in the NEWS file (which did not exist in version 0.1)
-    [ ! -f "$_newsFile" ] && echo "$_defaultVersion" && return 0
+    [ ! -f "$_fileWithVersion" ] && echo "$_defaultVersion" && return 0
 
     # Extracts the version.
-    grep "version [0-9]" "$_newsFile" |head -n 1 |sed -e 's/^.*version[ \t]\([0-9][0-9.]*\)[ \t].*$/\1/;s/^.*version[ \t]\([0-9][0-9.]*\)$/\1/;'
+    grep "version [0-9]" "$_fileWithVersion" |head -n 1 |sed -e 's/^.*version[ \t*]\([0-9][0-9.]*\)[ \t*].*$/\1/;s/^.*version[ \t]\([0-9][0-9.]*\)$/\1/;'
 }
 
 # usage: getDetailedVersion <Major Version> <installation directory>
@@ -865,7 +867,7 @@ function isRunningProcess() {
 
   # It is not the case, informs and deletes the PID file.
   deletePIDFile "$_pidFile"
-  info "process is dead but pid file exists. Deleted it."
+  info "process is dead but pid file still exists. Deleted it."
   return 1
 }
 
@@ -968,10 +970,24 @@ function setUpKillChildTrap() {
   trap 'writeMessage "Killing all processes of the group of main process $TRAP_processName"; killChildProcesses $$ 1; exit 0' EXIT
 }
 
-# usage: manageDaemon <action> <name> <pid file> <process> [<logFile> <outputFile> [<options>]]
-#   action can be: start, status, stop (and daemon, only for internal purposes)
-#   logFile, outputFile are only needed if action is "start"
-#   options (which MUST be an array containing any count of elements) is only needed if action is "daemon"
+# usage: manageDaemon <action> <name> <pid file> <process name> [<logFile> <outputFile> [<options>]]
+#   <action> can be one of:
+#    - $BSC_DAEMON_ACTION_START   starts the daemon
+#    - $BSC_DAEMON_ACTION_STATUS  checks the status of the daemon
+#    - $BSC_DAEMON_ACTION_STOP    stops the daemon
+#    - $BSC_DAEMON_ACTION_RUN     (internal) (optional) runs instructions of the Daemon itself
+#    - $BSC_DAEMON_ACTION_DAEMON  (internal) daemonizes really the daemon
+#   <name> name of your Daemon script
+#   <pid file> the PID file to use to manage the process which will be "daemonized"
+#   <process name> the name/path of the process to launch (can be a third party tool, or the Daemon script itself)
+#   <logFile> and <outputFile> are only needed if action is "start"
+#   <options> (which MUST be an array containing any count of elements), only needed if action is "daemon"
+#
+# Action state machine:
+#   Start => (internal) Daemon => (optional*)(internal) Run => Stop
+#   At any time, the Status can be requested to get the status of the daemon
+#   * the Run action is only used if Daemon script is running itself
+#      some instructions instead of launching third party tools
 function manageDaemon() {
   local _action="$1" _name="$2" _pidFile="$3" _processName="$4"
   local _logFile="$5" _outputFile="$6"
@@ -997,7 +1013,7 @@ function manageDaemon() {
       isRunningProcess "$_pidFile" "$_processName" && writeMessage "$_name is already running." && return 0
 
       # Starts it, launching this script in daemon mode.
-      BSC_LOG_FILE="$_logFile" BSC_LOG_CONSOLE_OFF=${BSC_LOG_CONSOLE_OFF:-1} "$0" -D >>"$_outputFile" &
+      BSC_LOG_FILE="$_logFile" BSC_LOG_CONSOLE_OFF=${BSC_LOG_CONSOLE_OFF:-1} "$0" "$BSC_DAEMON_OPTION_DAEMON" >>"$_outputFile" &
       writeMessage "Launched $_name."
     ;;
 
@@ -1146,8 +1162,8 @@ declare -r _BSC_DEFAULT_TMP_DIR="${BSC_TMP_DIR:-/tmp/$( getFormattedDatetime '%Y
 declare -r _BSC_DEFAULT_PID_DIR="$_BSC_DEFAULT_TMP_DIR/_pids"
 
 declare -r _BSC_DEFAULT_LOG_FILE="${_BSC_DEFAULT_LOG_FILE:-$_BSC_DEFAULT_TMP_DIR/logFile.log}"
-declare -r _BSC_DEFAULT_CONFIG_FILE="$_BSC_DEFAULT_ROOT_DIR/.config/$launchedScriptName.conf"
-declare -r _BSC_DEFAULT_GLOBAL_CONFIG_FILE="/etc/$launchedScriptName.conf"
+declare -r _BSC_DEFAULT_CONFIG_FILE="${HOME:-/home/$( whoami )}/.config/${launchedScriptName%[.]*}.conf"
+declare -r _BSC_DEFAULT_GLOBAL_CONFIG_FILE="/etc/${launchedScriptName%[.]*}.conf"
 declare -r _BSC_DEFAULT_TIME_FILE="$_BSC_DEFAULT_TMP_DIR/timeFile"
 
 declare -r _BSC_DEFAULT_DAEMON_STOP_TIMEOUT=16
@@ -1187,9 +1203,6 @@ BSC_MODE_CHECK_CONFIG=${BSC_MODE_CHECK_CONFIG:-0}
 BSC_CATEGORY=${BSC_CATEGORY:-general}
 # By default, system logs messages on console.
 BSC_LOG_CONSOLE_OFF=${BSC_LOG_CONSOLE_OFF:-0}
-# By default, each component has a specific log file
-#  (BSC_LOG_FILE_APPEND_MODE allows to define if caller script can continue to log in same file).
-BSC_LOG_FILE_APPEND_MODE=${BSC_LOG_FILE_APPEND_MODE:-0}
 
 # By default, any error message will totally ends the script.
 # This variable allows changing this behaviour (NOT recommended !!!)
