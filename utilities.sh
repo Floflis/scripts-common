@@ -848,16 +848,16 @@ function getProcessNameFromFile() {
   doExtractInfoFromPIDFile "$1" "processName"
 }
 
-# usage: isRunningProcess <pid file> <process name>
+# usage: isRunningProcess <pid file>
 function isRunningProcess() {
-  local _pidFile="$1" _processName
-  _processName="$( basename "$2" )" # Removes the path which can be different between each action
+  local _pidFile="$1" _pidToCheck _processName
 
   # Checks if PID file exists, otherwise regard process as NOT running.
-  [ ! -f "$_pidFile" ] && info "PID file '$_pidFile' does not exist (anymore). System will consider process '$_processName' as NOT running." && return 1
+  [ ! -f "$_pidFile" ] && info "PID file '$_pidFile' does not exist (anymore). System will consider process as NOT running." && return 1
 
-  # Extracts the PID.
-  pidToCheck=$( getPIDFromFile "$_pidFile" ) || return 1
+  # Extracts the PID, and process name.
+  _pidToCheck=$( getPIDFromFile "$_pidFile" ) || return 1
+  _processName=$( getProcessNameFromFile "$_pidFile" ) || return 1
 
   # Special hacks to help users. Some application uses symbolic links, and so running process name
   #  won't be the same than launched process name. For instance it is the case with SoX (in particular
@@ -868,8 +868,8 @@ function isRunningProcess() {
   [ "$_processName" = "rec" ] && _processName="$_processName|sox"
 
   # Checks if a process with specified PID is running.
-  info "Checking running process, PID=$pidToCheck, process=$_processName."
-  [ "$( pgrep -f "$_processName" |grep -wc "$pidToCheck" )" -eq 1 ] && return 0
+  info "Checking running process, PID=$_pidToCheck, process=$_processName."
+  [ "$( pgrep -f "$_processName" |grep -wc "$_pidToCheck" )" -eq 1 ] && return 0
 
   # It is not the case, informs and deletes the PID file.
   deletePIDFile "$_pidFile"
@@ -886,11 +886,9 @@ function checkAllProcessFromPIDFiles() {
   info "Check any existing PID file in '$_pidDir' (and clean if corresponding process is no more running)."
   # For any existing PID file.
   while IFS= read -r -d '' pidFile; do
-    processName=$( getProcessNameFromFile "$pidFile" )
-
     # Checks if there is still a process with this name and this PID,
     #  if it is not the case, the PID file will be removed.
-    isRunningProcess "$pidFile" "$processName"
+    isRunningProcess "$pidFile"
   done < <(find "$_pidDir" -type f -iname "*.pid" -print0)
 }
 
@@ -938,14 +936,14 @@ function _stopProcess() {
 
   # Waits until process stops, or timeout is reached.
   remainingTime=$BSC_DAEMON_STOP_TIMEOUT
-  while [ "$remainingTime" -gt 0 ] && isRunningProcess "$_pidFile" "$_processName"; do
+  while [ "$remainingTime" -gt 0 ] && isRunningProcess "$_pidFile"; do
     # Waits 1 second.
     sleep 1
     (( remainingTime-- ))
   done
 
   # Checks if it is still running, otherwise deletes the PID file ands returns.
-  ! isRunningProcess "$_pidFile" "$_processName" && deletePIDFile "$_pidFile" && return 0
+  ! isRunningProcess "$_pidFile" && deletePIDFile "$_pidFile" && return 0
 
   # Destroy the process.
   info "Killing process stop, PID=$pidToStop, process=$_processName."
@@ -1019,7 +1017,7 @@ function manageDaemon() {
 
     $BSC_DAEMON_ACTION_START)
       # Ensures it is not already running.
-      isRunningProcess "$_pidFile" "$_processName" && writeMessage "$_name is already running." && return 0
+      isRunningProcess "$_pidFile" && writeMessage "$_name is already running." && return 0
 
       # Starts it, launching this script in daemon mode.
       BSC_LOG_FILE="$_logFile" BSC_LOG_CONSOLE_OFF=${BSC_LOG_CONSOLE_OFF:-1} "$0" "$BSC_DAEMON_OPTION_DAEMON" >>"$_outputFile" &
@@ -1027,7 +1025,7 @@ function manageDaemon() {
     ;;
 
     $BSC_DAEMON_ACTION_STATUS)
-      if isRunningProcess "$_pidFile" "$_processName"; then
+      if isRunningProcess "$_pidFile"; then
         writeMessage "$_name is running."
       else
         writeMessage "$_name is NOT running."
@@ -1036,7 +1034,7 @@ function manageDaemon() {
 
     $BSC_DAEMON_ACTION_STOP)
       # Checks if it is running.
-      ! isRunningProcess "$_pidFile" "$_processName" && writeMessage "$_name is NOT running." && return 0
+      ! isRunningProcess "$_pidFile" && writeMessage "$_name is NOT running." && return 0
 
       # Stops the process.
       _stopProcess "$_pidFile" "$_processName" || errorMessage "Unable to stop $_name."
