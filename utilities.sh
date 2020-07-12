@@ -951,7 +951,7 @@ function _stopProcess() {
 }
 
 # usage: killChildProcesses <pid> [1]
-# 1: toggle defining it is the top hierarchy process.
+# 1: toggle defining it is the top hierarchy process (and thus won't be killed).
 function killChildProcesses() {
   local _pid="$1" _topProcess="${2:-0}"
 
@@ -979,22 +979,27 @@ function _setUpKillChildTrap() {
 
 # usage: manageDaemon <action> <name> <pid file> <process name> [<logFile> <outputFile> [<options>]]
 #   <action> can be one of:
-#    - $BSC_DAEMON_ACTION_START   starts the daemon
-#    - $BSC_DAEMON_ACTION_STATUS  checks the status of the daemon
-#    - $BSC_DAEMON_ACTION_STOP    stops the daemon
-#    - $BSC_DAEMON_ACTION_RUN     (internal) (optional) runs instructions of the Daemon itself
-#    - $BSC_DAEMON_ACTION_DAEMON  (internal) daemonizes really the daemon
-#   <name> name of your Daemon script
-#   <pid file> the PID file to use to manage the process which will be "daemonized"
-#   <process name> the name/path of the process to launch (can be a third party tool, or the Daemon script itself)
-#   <logFile> and <outputFile> are only needed if action is "start"
-#   <options> (which MUST be an array containing any count of elements), only needed if action is "daemon"
+#    - $BSC_DAEMON_ACTION_START   requests start of the Daemon
+#    - $BSC_DAEMON_ACTION_STATUS  checks the status of the Daemon
+#    - $BSC_DAEMON_ACTION_STOP    stops the Daemon and all its potential child processes
+#    - $BSC_DAEMON_ACTION_RUN     (internal) (optional) runs instructions of the Daemon script itself
+#    - $BSC_DAEMON_ACTION_DAEMON  (internal) really turns to a daemon
 #
-# Action state machine:
-#   Start => (internal) Daemon => (optional*)(internal) Run => Stop
+#   <name>         name of your Daemon script
+#   <pid file>     the PID file to use to manage the process which will be "daemonized"
+#   <process name> the name/path of the process to launch (can be a third party tool, or the Daemon script itself)
+#   <logFile>      the log file to define with $BSC_LOG_FILE variable (See Logger Feature) in the Daemon process context
+#                  only needed if action is $BSC_DAEMON_ACTION_START
+#   <outputFile>   the file in which Daemon output will be redirected
+#                  only needed if action is $BSC_DAEMON_ACTION_START
+#   <options>      Daemon options, MUST be an GNU/Bash array
+#                  only needed if action is $BSC_DAEMON_ACTION_DAEMON
+#
+# Action call flow:
+#   Start => (internal) Daemon => (optional)(internal) Run* => Stop
 #   At any time, the Status can be requested to get the status of the daemon
 #   * the Run action is only used if Daemon script is running itself
-#      some instructions instead of launching third party tools
+#      some instructions instead of launching third party tool
 function manageDaemon() {
   local _action="$1" _name="$2" _pidFile="$3" _processName="$4"
   local _logFile="$5" _outputFile="$6"
