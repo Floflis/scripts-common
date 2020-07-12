@@ -334,16 +334,25 @@ function checkPath() {
 
 # usage: checkBin <binary name/path>
 function checkBin() {
-  local _binary="$1"
+  local _binary="$1" _full_path
 
   # Informs only if not in 'BSC_MODE_CHECK_CONFIG' mode.
   ! isCheckModeConfigOnly && info "Checking binary '$_binary' ... "
 
   # Checks if the binary is available.
-  command -v "$_binary" >/dev/null 2>&1 && return 0
+  _full_path=$( command -v "$_binary" )
+  commandStatus=$?
+  if [ $commandStatus -ne 0 ]; then
+    # It is not the case, if NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error.
+    ! isCheckModeConfigOnly && errorMessage "Unable to find binary '$_binary'." $BSC_ERROR_CHECK_BIN
+  else
+    # Checks if the binary has "execute" permission.
+    [ -x "$_full_path" ] && return 0
 
-  # It is not the case, if NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error.
-  ! isCheckModeConfigOnly && errorMessage "Unable to find binary '$_binary'." $BSC_ERROR_CHECK_BIN
+    # It is not the case, if NOT in 'BSC_MODE_CHECK_CONFIG' mode, it is a fatal error.
+    ! isCheckModeConfigOnly && errorMessage "Binary '$_binary' found but it does not have *execute* permission." $BSC_ERROR_CHECK_BIN
+  fi
+
   # Otherwise, simple returns an error code.
   return $BSC_ERROR_CHECK_BIN
 }
