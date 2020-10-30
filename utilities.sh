@@ -301,7 +301,7 @@ function pruneSlash() {
   # Unable to perform equivalent instruction only in GNU/Bash (because there is no way to 'say' 'end of line'):
   #  - ${HOME/%\//} -> removes only ONE ending slash if any
   #  - ${HOME/%\/\/*/} -> removes everything even if there is path pieces after last slash.
-  echo "$1" |sed -e 's/\/\/*/\//g;s/^\(.[^\/][^\/]*\)\/\/*$/\1/'
+  echo "$1" |sed -e 's/\/\/*/\//g;s/^\(.[^\/][^\/]*\)\/\/*$/\1/;s/^\(.*\)\/$/\1/'
 }
 
 # usage: isRelativePath <path>
