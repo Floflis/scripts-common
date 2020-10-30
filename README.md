@@ -1,4 +1,4 @@
-**scripts-common version 2.1.0** [![Codacy Badge](https://api.codacy.com/project/badge/Grade/30f3d380d4c846689aaccfbc87b1a883)](https://www.codacy.com/manual/gitlabRepositories/scripts-common-tests_2?utm_source=gitlab.com&amp;utm_medium=referral&amp;utm_content=bertrand-benoit/scripts-common-tests&amp;utm_campaign=Badge_Grade)
+**scripts-common version 2.1.1** [![Codacy Badge](https://api.codacy.com/project/badge/Grade/30f3d380d4c846689aaccfbc87b1a883)](https://www.codacy.com/manual/gitlabRepositories/scripts-common-tests_2?utm_source=gitlab.com&amp;utm_medium=referral&amp;utm_content=bertrand-benoit/scripts-common-tests&amp;utm_campaign=Badge_Grade)
 [![pipeline status](https://gitlab.com/bertrand-benoit/scripts-common/badges/master/pipeline.svg)](https://gitlab.com/bertrand-benoit/scripts-common/-/commits/master)
 [![coverage report](https://gitlab.com/bertrand-benoit/scripts-common/badges/master/coverage.svg)](https://gitlab.com/bertrand-benoit/scripts-common/-/commits/master)
 

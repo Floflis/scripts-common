@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Author: Bertrand Benoit <mailto:contact@bertrand-benoit.net>
-# Version: 2.1
+# Version: 2.1.1
 #
 # Description: Free common utilities/tool-box for GNU/Bash scripts.
 #
