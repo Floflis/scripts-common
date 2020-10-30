@@ -201,7 +201,7 @@ function _doWriteMessage() {
   [ "$( echo "$_exitCode" |grep -ce "^-*[0-9][0-9]*$" )" -ne 1 ] && _exitCode="-1"
 
   # Does nothing if INFO message and NOT BSC_VERBOSE.
-  [ "$BSC_VERBOSE" -eq 0 ] && [ "$_level" = "$_BSC_LOG_LEVEL_INFO" ] && return 0
+  [ "$BSC_VERBOSE" -eq 0 ] && [ "$BSC_DEBUG_UTILITIES" -eq 0 ] && [ "$_level" = "$_BSC_LOG_LEVEL_INFO" ] && return 0
 
   # Manages level.
   _messagePrefix=""
