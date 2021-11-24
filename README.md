@@ -104,6 +104,7 @@ But if you want to tune scripts-common, there are lots of optional variables you
 -   **BSC_ROOT_DIR**               `<path>`  root directory to consider when performing various check
 -   **BSC_TMP_DIR**                `<path>`  temporary directory where various dump files are created
 -   **BSC_PID_DIR**                `<path>`  directory where PID files are created to manage daemon feature
+-   **BSC_TIME_FILE**              `<path>`  temporary file used when using time feature
 -   **BSC_CONFIG_FILE**            `<path>`  path of configuration file to consider
 -   **BSC_GLOBAL_CONFIG_FILE**     `<path>`  path of GLOBAL configuration file to consider
 -   **BSC_DISABLE_ERROR_TRAP**       `0|1`   disable TRAP on error (recommended only for Tests project where assert leads to 'error')
@@ -111,6 +112,7 @@ But if you want to tune scripts-common, there are lots of optional variables you
 -   **BSC_FORCE_COMPAT_MODE**        `0|1`   enable compatibility mode (not recommended in production)
 -   **BSC_VERBOSE**                  `0|1`   enable Verbose mode, showing INFO messages (not recommended in production)
 -   **BSC_CATEGORY**             `<string>`  the category which prepends all messages
+-   **BSC_TIME_FORMAT**            `<path>`  the time format which prepends all messages
 -   **BSC_LOG_CONSOLE_OFF**          `0|1`   disable message output on console
 -   **BSC_LOG_FILE**               `<path>`  path of the log file
 -   **BSC_MODE_CHECK_CONFIG**        `0|1`   check ALL configuration and then quit (useful to check all the configuration you want, +/- like a dry run)
