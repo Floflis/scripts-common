@@ -212,7 +212,7 @@ function _doWriteMessage() {
   [ "$_newLine" -eq 0 ] && printMessageEnd="" || printMessageEnd="\n"
 
   # Checks if message must be shown on console.
-  _timestamp=$( getFormattedDatetime '%Y-%d-%m %H:%M.%S' )
+  _timestamp=$( getFormattedDatetime "$BSC_TIME_FORMAT" )
   if [ "$BSC_LOG_CONSOLE_OFF" -eq 0 ]; then
     printf "%-17s %-15s $_messagePrefix%b$printMessageEnd" "$_timestamp" "[$BSC_CATEGORY]" "$_message" |tee -a "$BSC_LOG_FILE"
   else
@@ -1187,6 +1187,8 @@ declare -r _BSC_DEFAULT_CONFIG_FILE="${HOME:-/home/$( whoami )}/.config/${launch
 declare -r _BSC_DEFAULT_GLOBAL_CONFIG_FILE="/etc/${launchedScriptName%[.]*}.conf"
 declare -r _BSC_DEFAULT_TIME_FILE="$_BSC_DEFAULT_TMP_DIR/timeFile"
 
+declare -r _BSC_DEFAULT_TIME_FORMAT="%Y-%m-%d %H:%M.%S"
+
 declare -r _BSC_DEFAULT_DAEMON_STOP_TIMEOUT=16
 
 updateStructure "$_BSC_DEFAULT_PID_DIR"
@@ -1203,6 +1205,9 @@ BSC_LOG_FILE=${BSC_LOG_FILE:-$_BSC_DEFAULT_LOG_FILE}
 BSC_CONFIG_FILE=${BSC_CONFIG_FILE:-$_BSC_DEFAULT_CONFIG_FILE}
 BSC_GLOBAL_CONFIG_FILE=${BSC_GLOBAL_CONFIG_FILE:-$_BSC_DEFAULT_GLOBAL_CONFIG_FILE}
 BSC_TIME_FILE=${BSC_TIME_FILE:-$_BSC_DEFAULT_TIME_FILE}
+
+# Defines the time format used in formatted messages.
+BSC_TIME_FORMAT=${BSC_TIME_FORMAT:-$_BSC_DEFAULT_TIME_FORMAT}
 
 # Defines the daemon timeout when requesting its stop, before killing it.
 BSC_DAEMON_STOP_TIMEOUT=${BSC_DAEMON_STOP_TIMEOUT:-$_BSC_DEFAULT_DAEMON_STOP_TIMEOUT}

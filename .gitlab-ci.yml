@@ -10,7 +10,7 @@
   - echo "Installing git, procps, locale, ruby (required for bashcov), inotify-tools, java, ant and maven"
   - export MUSL_LOCPATH=/usr/local/share/i18n/locales/musl
   - apk update && apk upgrade && apk add --no-cache git procps cmake make musl-dev gcc gettext-dev libintl inotify-tools ruby ruby-dev openjdk9-jdk apache-ant maven
-  - ln -s /usr/lib/jvm/default-jvm/jre/bin/javac /usr/bin/javac
+# No more needed  - ln -s /usr/lib/jvm/default-jvm/jre/bin/javac /usr/bin/javac
   - gem install bashcov
   - cd ..
   - git clone https://gitlab.com/rilian-la-te/musl-locales.git
