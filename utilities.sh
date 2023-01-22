@@ -279,6 +279,8 @@ function errorMessage() {
   _doWriteMessage $_BSC_LOG_LEVEL_ERROR "${1:-$_BSC_LOG_NO_MESSAGE}" 1 "${2:-$BSC_ERROR_DEFAULT}" >&2
 }
 
+# This version of scripts-common is deprecated, new Gitlab version must be used.
+warning "Deprecated: your scripts-common version is deprecated. You should switch to newer version: https://gitlab.com/bertrand-benoit/scripts-common"
 
 #########################
 ## Functions - [Check]Path Feature

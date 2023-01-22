@@ -1,6 +1,14 @@
+<<<<<<< HEAD
 **scripts-common version 2.1.1** [![Codacy Badge](https://api.codacy.com/project/badge/Grade/30f3d380d4c846689aaccfbc87b1a883)](https://www.codacy.com/manual/gitlabRepositories/scripts-common-tests_2?utm_source=gitlab.com&amp;utm_medium=referral&amp;utm_content=bertrand-benoit/scripts-common-tests&amp;utm_campaign=Badge_Grade)
 [![pipeline status](https://gitlab.com/bertrand-benoit/scripts-common/badges/master/pipeline.svg)](https://gitlab.com/bertrand-benoit/scripts-common/-/commits/master)
 [![coverage report](https://gitlab.com/bertrand-benoit/scripts-common/badges/master/coverage.svg)](https://gitlab.com/bertrand-benoit/scripts-common/-/commits/master)
+=======
+:warning: This project is now hosted on [Gitlab](https://gitlab.com/bertrand-benoit/scripts-common); switch to it to get newer versions.
+
+# scripts-common version 2.0.0
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/f61fd4ae962a42dd93cca6de29ac8c1d)](https://www.codacy.com/app/bertrand-benoit/scripts-common?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=bertrand-benoit/scripts-common&amp;utm_campaign=Badge_Grade)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2583/badge)](https://bestpractices.coreinfrastructure.org/projects/2583)
+>>>>>>> 0466458534360ca3b619ed11e4b411b34ca938ad
 
 This is a free common utilities/tool-box for GNU/Bash scripts, you can use for your own scripts.
 
@@ -34,7 +42,11 @@ Thanks to [Gitlab CI/CD](https://docs.gitlab.com/ee/ci/), it is continuously int
 ## Context
 Around 2000, I started writing it for my personal needs, creating lots of scripts at home and at work.
 
+<<<<<<< HEAD
 In 2010, I created [Hemera Intelligent System](https://gitlab.com/bertrand-benoit/hemerais/wikis) ([Repository](https://gitlab.com/bertrand-benoit/hemerais)), in which I factorized all my utilities, and developed a more robust version.
+=======
+In 2010, I created [Hemera Intelligent System](https://gitlab.com/bertrand-benoit/hemerais/wikis) ([Repository](https://gitlab.com/bertrand-benoit/hemerais)), in which I factorized all my utilities, and developed more robust version.
+>>>>>>> 0466458534360ca3b619ed11e4b411b34ca938ad
 
 In 2019, I extracted the Hemera's utilities part, and enhanced it to get it generic, to share it with everyone. It was the birth of this scripts-common project.
 
@@ -44,7 +56,11 @@ You can add this project as [submodule](https://git-scm.com/book/en/v2/Git-Tools
 
 You can adapt the name of the branch you want to use (`stable` is the recommended one), for instance with the git URL:
 ```bash
+<<<<<<< HEAD
 git submodule add -b stable git@gitlab.com:bertrand-benoit/scripts-common.git
+=======
+git submodule add git@gitlab.com:bertrand-benoit/scripts-common.git
+>>>>>>> 0466458534360ca3b619ed11e4b411b34ca938ad
 ```
 
 If you prefer, you can use the HTTPS URL:
